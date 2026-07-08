@@ -90,7 +90,7 @@ async function renderDetail(container, planId) {
   container.appendChild(wrap);
 }
 
-function openPlanModal(plan, groups, templates, onSaved) {
+function openPlanModal(plan, groups, templates, exercises, onSaved) {
   const isEdit = !!plan;
   const data = plan ? { ...plan, days: (plan.days || []).map(d => ({ ...d, sets: d.sets.map(s => ({ ...s })) })) } : {
     name: `Trainingswoche ${startOfWeek(todayISO())}`, weekStart: startOfWeek(todayISO()), groupId: groups[0]?.id || '', status: 'aktiv', days: [],
