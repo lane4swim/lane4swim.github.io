@@ -1,7 +1,7 @@
 // ============================================================
 // app.js — bootstraps the application.
 // ============================================================
-import { getAll } from './db.js';
+import { getAll, pendingSyncCount } from './db.js';
 import { seedIfEmpty, resetDemoData } from './seed.js';
 import { initSession, getCurrentUser, setCurrentUserById, getRole, onUserChange } from './state.js';
 import { registerModule, visibleModules, currentRoute, navigate, onRouteChange, getModule } from './router.js';
@@ -17,9 +17,10 @@ import { catalogModule } from './modules/catalog.js';
 import { sessionsModule } from './modules/sessions.js';
 import { actionItemsModule } from './modules/actionItems.js';
 import { statsModule } from './modules/stats.js';
+import { syncQueueModule } from './modules/syncQueue.js';
 
 [dashboardModule, athletesModule, competitionsModule, timesModule, plansModule,
-  templatesModule, catalogModule, sessionsModule, actionItemsModule, statsModule]
+  templatesModule, catalogModule, sessionsModule, actionItemsModule, statsModule, syncQueueModule]
   .forEach(registerModule);
 
 const viewEl = document.getElementById('view');
@@ -66,16 +67,27 @@ function buildNav() {
   clear(navList);
   clear(bottomNav);
   mods.forEach(m => {
+    const navBadge = m.id === 'syncqueue' ? el('span', { class: 'nav-badge', hidden: true }) : null;
     const li = el('li', {}, el('button', { class: 'nav-link', 'data-route': m.id, onclick: () => navigate(m.id) }, [
-      el('span', { class: 'ic', html: m.icon }), el('span', {}, m.label),
-    ]));
+      el('span', { class: 'ic', html: m.icon }), el('span', { style: 'flex:1' }, m.label), navBadge,
+    ].filter(Boolean)));
     navList.appendChild(li);
-    const bBtn = el('button', { 'data-route': m.id, onclick: () => navigate(m.id) }, [
-      el('span', { class: 'ic', html: m.icon }), el('span', {}, m.label.split(' ')[0]),
-    ]);
+    const bottomBadge = m.id === 'syncqueue' ? el('span', { class: 'nav-badge nav-badge-mobile', hidden: true }) : null;
+    const bBtn = el('button', { 'data-route': m.id, onclick: () => navigate(m.id), style: 'position:relative' }, [
+      el('span', { class: 'ic', html: m.icon }), el('span', {}, m.label.split(' ')[0]), bottomBadge,
+    ].filter(Boolean));
     bottomNav.appendChild(bBtn);
   });
   markActive(currentRoute().routeId);
+  updateSyncBadge();
+}
+
+async function updateSyncBadge() {
+  const count = await pendingSyncCount();
+  document.querySelectorAll('.nav-badge').forEach(b => {
+    b.textContent = count > 99 ? '99+' : String(count);
+    b.hidden = count === 0;
+  });
 }
 
 function markActive(routeId) {
@@ -99,6 +111,7 @@ async function render(route) {
     ]));
   }
   viewEl.focus();
+  updateSyncBadge();
 }
 
 // ---------------- Settings modal ----------------
