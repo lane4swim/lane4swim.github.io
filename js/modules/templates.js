@@ -13,7 +13,7 @@ export const templatesModule = {
   async render(container) {
     clear(container);
     const [templates, exercises] = await Promise.all([getAll('templates'), getAll('exercises')]);
-    renderList(container, templates);
+    renderList(container, templates, exercises);
   }
 };
 
@@ -21,7 +21,7 @@ function renderList(container, templates, exercises) {
   const wrap = el('div');
   wrap.appendChild(el('div', { class: 'page-head' }, [
     el('div', {}, [el('div', { class: 'page-eyebrow' }, `${templates.length} Vorlagen`), el('h1', { class: 'mt-0' }, 'Trainingsplan-Vorlagen')]),
-    el('div', { class: 'page-actions' }, [el('button', { class: 'btn btn-primary', onclick: () => openTemplateModal(null, refresh) }, '+ Vorlage erstellen')]),
+    el('div', { class: 'page-actions' }, [el('button', { class: 'btn btn-primary', onclick: () => openTemplateModal(null, exercises, refresh) }, '+ Vorlage erstellen')]),
   ]));
   wrap.appendChild(laneWave());
   wrap.appendChild(el('p', {}, 'Vorlagen lassen sich beim Erstellen eines Trainingsplans für einen Tag übernehmen und danach frei anpassen.'));
@@ -43,7 +43,7 @@ function renderList(container, templates, exercises) {
     ])));
     card.appendChild(list);
     card.appendChild(el('div', { class: 'flex gap-8' }, [
-      el('button', { class: 'btn btn-ghost btn-sm', onclick: () => openTemplateModal(t, refresh) }, 'Bearbeiten'),
+      el('button', { class: 'btn btn-ghost btn-sm', onclick: () => openTemplateModal(t, exercises, refresh) }, 'Bearbeiten'),
       el('button', { class: 'btn btn-danger btn-sm', onclick: () => confirmAction(`Vorlage "${t.name}" löschen?`, async () => { await remove('templates', t.id); toast('Vorlage gelöscht'); refresh(); }) }, 'Löschen'),
     ]));
     host.appendChild(card);
