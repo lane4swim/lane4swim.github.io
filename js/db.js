@@ -7,7 +7,7 @@ const DB_VERSION = 1;
 
 export const STORES = [
   'users', 'athletes', 'groups', 'competitions', 'entries', 'results',
-  'exercises', 'templates', 'plans', 'sessions', 'actionItems', 'meta'
+  'exercises', 'templates', 'plans', 'sessions', 'actionItems', 'meta', 'syncQueue'
 ];
 
 let dbPromise = null;
@@ -57,19 +57,31 @@ export async function get(store, id){
   });
 }
 
+// Stores that represent internal bookkeeping rather than user content —
+// changes to these are never queued for sync (that would be circular for
+// syncQueue itself, and 'meta' is purely local app state).
+const SYNC_EXCLUDED = new Set(['syncQueue', 'meta']);
+
 export async function put(store, obj){
+  const isNew = !obj.id;
   if (!obj.id) obj.id = uid();
   obj.updatedAt = new Date().toISOString();
   if (!obj.createdAt) obj.createdAt = obj.updatedAt;
   const os = await tx(store, 'readwrite');
-  return new Promise((resolve, reject) => {
+  const saved = await new Promise((resolve, reject) => {
     const req = os.put(obj);
     req.onsuccess = () => resolve(obj);
     req.onerror = () => reject(req.error);
   });
+  if (!SYNC_EXCLUDED.has(store)) {
+    await enqueueSyncEvent(store, saved.id, isNew ? 'create' : 'update', saved);
+  }
+  return saved;
 }
 
 export async function bulkPut(store, items){
+  // Used for seeding/import — deliberately does NOT enqueue sync events,
+  // since seeded/imported data isn't an "offline change" made by a user.
   const os = await tx(store, 'readwrite');
   return new Promise((resolve, reject) => {
     items.forEach(it => {
@@ -83,11 +95,15 @@ export async function bulkPut(store, items){
 
 export async function remove(store, id){
   const os = await tx(store, 'readwrite');
-  return new Promise((resolve, reject) => {
+  await new Promise((resolve, reject) => {
     const req = os.delete(id);
     req.onsuccess = () => resolve(true);
     req.onerror = () => reject(req.error);
   });
+  if (!SYNC_EXCLUDED.has(store)) {
+    await enqueueSyncEvent(store, id, 'delete', null);
+  }
+  return true;
 }
 
 export async function clearStore(store){
@@ -123,4 +139,42 @@ export async function importAll(dump){
 
 export async function wipeAll(){
   for (const s of STORES) await clearStore(s);
+}
+
+// ============================================================
+// Sync queue (Event Queue) — every create/update/delete made by a
+// user against a "syncable" store is appended here. A separate
+// sync engine (js/sync.js) later drains this queue toward a server.
+// ============================================================
+
+export async function enqueueSyncEvent(store, entityId, action, payload){
+  const evt = {
+    id: uid(), store, entityId, action, payload,
+    createdAt: new Date().toISOString(), status: 'pending',
+    attempts: 0, lastError: null, syncedAt: null,
+  };
+  return put('syncQueue', evt);
+}
+
+export function getSyncQueue(){
+  return getAll('syncQueue');
+}
+
+export async function updateSyncEvent(id, patch){
+  const evt = await get('syncQueue', id);
+  if (!evt) return null;
+  Object.assign(evt, patch);
+  return put('syncQueue', evt);
+}
+
+export async function clearSyncedEvents(){
+  const all = await getAll('syncQueue');
+  const synced = all.filter(e => e.status === 'synced');
+  for (const e of synced) await remove('syncQueue', e.id);
+  return synced.length;
+}
+
+export async function pendingSyncCount(){
+  const all = await getAll('syncQueue');
+  return all.filter(e => e.status === 'pending' || e.status === 'error').length;
 }
