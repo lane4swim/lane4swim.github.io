@@ -17,17 +17,17 @@ export const plansModule = {
   icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9.5h18"/><path d="M8 2.5v4M16 2.5v4"/></svg>`,
   async render(container, params) {
     clear(container);
-    const [plans, groups, templates] = await Promise.all([getAll('plans'), getAll('groups'), getAll('templates')]);
+    const [plans, groups, templates, exercises] = await Promise.all([getAll('plans'), getAll('groups'), getAll('templates'), getAll('exercises')]);
     if (params[0]) return renderDetail(container, params[0]);
-    renderList(container, plans, groups, templates);
+    renderList(container, plans, groups, templates, exercises);
   }
 };
 
-function renderList(container, plans, groups, templates) {
+function renderList(container, plans, groups, templates, exercises) {
   const wrap = el('div');
   wrap.appendChild(el('div', { class: 'page-head' }, [
     el('div', {}, [el('div', { class: 'page-eyebrow' }, `${plans.length} Trainingspläne`), el('h1', { class: 'mt-0' }, 'Trainingspläne')]),
-    el('div', { class: 'page-actions' }, [el('button', { class: 'btn btn-primary', onclick: () => openPlanModal(null, groups, templates, refresh) }, '+ Plan erstellen')]),
+    el('div', { class: 'page-actions' }, [el('button', { class: 'btn btn-primary', onclick: () => openPlanModal(null, groups, templates, exercises refresh) }, '+ Plan erstellen')]),
   ]));
   wrap.appendChild(laneWave());
 
@@ -47,11 +47,11 @@ function renderList(container, plans, groups, templates) {
     host.appendChild(card);
   });
 
-  async function refresh() { const [p2, g2, t2] = await Promise.all([getAll('plans'), getAll('groups'), getAll('templates')]); clear(container); renderList(container, p2, g2, t2); }
+  async function refresh() { const [p2, g2, t2, e2] = await Promise.all([getAll('plans'), getAll('groups'), getAll('templates'), getAll('exercises')]); clear(container); renderList(container, p2, g2, t2, e2); }
 }
 
 async function renderDetail(container, planId) {
-  const [plans, groups, templates] = await Promise.all([getAll('plans'), getAll('groups'), getAll('templates')]);
+  const [plans, groups, templates, exercises] = await Promise.all([getAll('plans'), getAll('groups'), getAll('templates'), getAll('exercises')]);
   const plan = plans.find(p => p.id === planId);
   if (!plan) { container.appendChild(emptyState('Nicht gefunden', 'Dieser Plan existiert nicht mehr.', el('button', { class: 'btn btn-primary', onclick: () => navigate('plans') }, 'Zurück'))); return; }
   const group = groups.find(g => g.id === plan.groupId);
