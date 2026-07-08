@@ -61,7 +61,7 @@ async function renderDetail(container, planId) {
   wrap.appendChild(el('div', { class: 'page-head' }, [
     el('div', {}, [el('div', { class: 'page-eyebrow' }, group?.name || 'Ohne Gruppe'), el('h1', { class: 'mt-0' }, plan.name)]),
     el('div', { class: 'page-actions' }, [
-      el('button', { class: 'btn btn-ghost', onclick: () => openPlanModal(plan, groups, templates, () => { clear(container); renderDetail(container, planId); }) }, 'Bearbeiten'),
+      el('button', { class: 'btn btn-ghost', onclick: () => openPlanModal(plan, groups, templates, exercises, () => { clear(container); renderDetail(container, planId); }) }, 'Bearbeiten'),
       el('button', { class: 'btn btn-danger', onclick: () => confirmAction('Diesen Trainingsplan löschen?', async () => { await remove('plans', planId); toast('Plan gelöscht'); navigate('plans'); }) }, 'Löschen'),
     ]),
   ]));
