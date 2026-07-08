@@ -122,7 +122,7 @@ function openPlanModal(plan, groups, templates, onSaved) {
       ]));
       const setsHost = el('div');
       block.appendChild(setsHost);
-      renderSetEditor(setsHost, day.sets);
+      renderSetEditor(setsHost, day.sets, exercises);
       daysHost.appendChild(block);
     });
   }
