@@ -12,12 +12,12 @@ export const templatesModule = {
   icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="4" rx="1"/><rect x="3" y="11" width="8" height="9" rx="1"/><rect x="13" y="11" width="8" height="9" rx="1"/></svg>`,
   async render(container) {
     clear(container);
-    const templates = await getAll('templates');
+    const [templates, exercises] = await Promise.all([getAll('templates'), getAll('exercises')]);
     renderList(container, templates);
   }
 };
 
-function renderList(container, templates) {
+function renderList(container, templates, exercises) {
   const wrap = el('div');
   wrap.appendChild(el('div', { class: 'page-head' }, [
     el('div', {}, [el('div', { class: 'page-eyebrow' }, `${templates.length} Vorlagen`), el('h1', { class: 'mt-0' }, 'Trainingsplan-Vorlagen')]),
@@ -49,10 +49,10 @@ function renderList(container, templates) {
     host.appendChild(card);
   });
 
-  async function refresh() { const t2 = await getAll('templates'); clear(container); renderList(container, t2); }
+  async function refresh() { const [t2, e2] = await Promise.all([getAll('templates'), getAll('exercises')]); clear(container); renderList(container, t2, e2); }
 }
 
-function openTemplateModal(template, onSaved) {
+function openTemplateModal(template, exercises, onSaved) {
   const isEdit = !!template;
   const data = template ? { ...template, sets: (template.sets || []).map(s => ({ ...s })) } : { name: '', description: '', tags: [], sets: [] };
   const form = el('form', { class: 'form-grid single' });
@@ -68,7 +68,7 @@ function openTemplateModal(template, onSaved) {
   const setsHost = el('div');
   setsWrap.appendChild(setsHost);
   form.appendChild(setsWrap);
-  renderSetEditor(setsHost, data.sets);
+  renderSetEditor(setsHost, data.sets, exercises);
 
   form.appendChild(el('div', { class: 'form-actions' }, [
     el('button', { type: 'button', class: 'btn btn-ghost', onclick: () => close() }, 'Abbrechen'),
