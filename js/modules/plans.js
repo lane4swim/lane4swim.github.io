@@ -27,7 +27,7 @@ function renderList(container, plans, groups, templates, exercises) {
   const wrap = el('div');
   wrap.appendChild(el('div', { class: 'page-head' }, [
     el('div', {}, [el('div', { class: 'page-eyebrow' }, `${plans.length} Trainingspläne`), el('h1', { class: 'mt-0' }, 'Trainingspläne')]),
-    el('div', { class: 'page-actions' }, [el('button', { class: 'btn btn-primary', onclick: () => openPlanModal(null, groups, templates, exercises refresh) }, '+ Plan erstellen')]),
+    el('div', { class: 'page-actions' }, [el('button', { class: 'btn btn-primary', onclick: () => openPlanModal(null, groups, templates, exercises, refresh) }, '+ Plan erstellen')]),
   ]));
   wrap.appendChild(laneWave());
 
