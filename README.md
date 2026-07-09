@@ -10,12 +10,13 @@ Laden keine Internetverbindung mehr.
 - **Athleten- & Teammanagement** — Profile, Trainingsgruppen
 - **Wettkampfmanagement** — Wettkämpfe, Ergebnisse
 - **Zeiten- & Leistungserfassung** — Bestzeiten, Verlaufsdiagramme
-- **Trainingspläne** — Wochenkalender mit Sets/Serien, aus Vorlagen erstellbar
+- **Trainingspläne** — Wochenkalender mit Sets/Serien **und Wiederholungsblöcken** (z. B. „3× [2×25 Sprint, 50 locker]“), aus Vorlagen erstellbar
 - **Wiederverwendbare Vorlagen** für Trainingspläne
 - **Übungskatalog** — durchsuchbare, taggable Übungsbibliothek
 - **Einheiten-Tracking & Feedback** — Anwesenheit, RPE, Notizen
 - **Handlungsfelder** — dokumentierte Entwicklungsziele je Athlet:in mit Status
 - **Statistiken & Auswertungen** — Anwesenheitsquote, RPE-Trend, Leistungsentwicklung
+- **Sync-Warteschlange** — Event-Queue (Outbox-Pattern) zur Vorbereitung einer künftigen Backend-Synchronisation, inkl. simulierter Übertragung in der Demo
 
 Drei Rollen: **Trainer**, **Athlet** und **Administrator** (siehe unten).
 
@@ -69,6 +70,10 @@ Daten als JSON exportieren oder auf die Demo-Daten zurücksetzen.
   zu hosten (auch als statische Dateien) und leicht nachvollziehbar.
 - **`js/db.js`** — generischer IndexedDB-Wrapper (`getAll/get/put/remove`)
   über benannte "Stores". Ein neues Datenmodell = ein neuer Store-Name.
+  `put()`/`remove()` schreiben bei jeder Änderung an einem fachlichen
+  Store automatisch ein Event in den Store `syncQueue` (Outbox-Pattern,
+  siehe unten) — Seed-/Import-Daten über `bulkPut()` lösen bewusst
+  **keine** Sync-Events aus, da sie keine echte Nutzeraktion sind.
 - **`js/router.js`** — minimaler Hash-Router mit Modul-Registry.
   Jedes Feature ist ein Modul mit `{ id, label, icon, roles, render() }`.
   Neue Module registrieren sich in `js/app.js` und erscheinen automatisch
@@ -96,6 +101,32 @@ Daten als JSON exportieren oder auf die Demo-Daten zurücksetzen.
   Teilen zwischen Vereinen.
 - Push-Benachrichtigungen für anstehende Einheiten/Wettkämpfe.
 - Mehrsprachigkeit (aktuell auf Deutsch ausgelegt).
+
+### Sync-Warteschlange (Event Queue / Outbox-Pattern)
+
+Unter **„Sync-Warteschlange"** (Trainer/Admin) wird sichtbar, was im
+Hintergrund passiert: Jedes Anlegen, Bearbeiten oder Löschen an einem
+fachlichen Datensatz (Athlet:innen, Pläne, Zeiten, …) erzeugt ein
+Event mit Status `pending`. Diese Events sind der Ausgangspunkt für
+eine spätere echte Backend-Synchronisation:
+
+1. Ein künftiger Sync-Prozess würde `pending`/`error`-Events in
+   Reihenfolge an eine Server-API senden, sobald eine Verbindung
+   besteht (z. B. beim `online`-Event des Browsers).
+2. Erfolgreich übertragene Events werden als `synced` markiert
+   (inkl. Zeitstempel), fehlgeschlagene als `error` mit Fehlermeldung
+   und Retry-Zähler.
+3. Da diese Version ganz ohne Server läuft, simuliert der Button
+   „Jetzt synchronisieren (Demo)" genau diesen Ablauf lokal (inkl.
+   gelegentlicher künstlicher Fehler, um die Retry-Funktion zu zeigen).
+
+Die Anzahl offener Events erscheint als kleines Badge neben dem
+Navigationspunkt. Für die echte Anbindung müsste im Wesentlichen nur
+`runSimulatedSync()` in `js/modules/syncQueue.js` durch einen
+tatsächlichen API-Aufruf ersetzt werden — die Datenstruktur der
+Warteschlange (`store`, `entityId`, `action`, `payload`) ist bereits
+so gehalten, dass sie sich 1:1 in typische REST-/GraphQL-Mutationen
+übersetzen lässt.
 
 ## Design
 
