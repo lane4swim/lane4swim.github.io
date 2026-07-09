@@ -5,6 +5,7 @@ import { getAll } from '../db.js';
 import { el, clear, fmtDateLong, todayISO, fullName, statCard, badge, laneWave, groupBy, average, secToTime } from '../utils.js';
 import { getRole, getCurrentUser } from '../state.js';
 import { navigate } from '../router.js';
+import { totalDistance } from './setEditor.js';
 
 export const dashboardModule = {
   id: 'dashboard',
@@ -58,7 +59,7 @@ async function renderTrainerDashboard(container) {
         el('div', { class: 'avatar' }, (group?.name || '?').slice(0, 2).toUpperCase()),
         el('div', { style: 'flex:1' }, [
           el('div', {}, `${fmtDateLong(day.date)}`),
-          el('div', { class: 'text-slate text-sm' }, `${plan.name} · ${day.sets?.length || 0} Sätze`),
+          el('div', { class: 'text-slate text-sm' }, `${plan.name} · ${totalDistance(day.sets || [])} m geplant`),
         ]),
       ]));
     });
