@@ -21,9 +21,7 @@ export const competitionsModule = {
     if (params[0]) return renderDetail(container, params[0]);
     renderList(container, competitions, athletes);
   }
-};
-
-function renderList(container, competitions, athletes) {
+};function renderList(container, competitions, athletes) {
   const today = todayISO();
   const wrap = el('div');
   wrap.appendChild(el('div', { class: 'page-head' }, [
@@ -64,10 +62,11 @@ function renderCompTable(list, emptyMsg) {
 }
 
 async function renderDetail(container, compId) {
-  const [competitions, athletes, results] = await Promise.all([getAll('competitions'), getAll('athletes'), getAll('results')]);
+  const [competitions, athletes, results, entries] = await Promise.all([getAll('competitions'), getAll('athletes'), getAll('results'), getAll('entries')]);
   const comp = competitions.find(c => c.id === compId);
   if (!comp) { container.appendChild(emptyState('Nicht gefunden', 'Dieser Wettkampf existiert nicht mehr.', el('button', { class: 'btn btn-primary', onclick: () => navigate('competitions') }, 'Zurück'))); return; }
   const compResults = results.filter(r => r.competitionId === compId);
+  const compEntries = entries.filter(e => e.competitionId === compId);
 
   const wrap = el('div');
   wrap.appendChild(el('button', { class: 'btn btn-ghost btn-sm mb-16', onclick: () => navigate('competitions') }, '← Alle Wettkämpfe'));
@@ -75,7 +74,7 @@ async function renderDetail(container, compId) {
     el('div', {}, [el('div', { class: 'page-eyebrow' }, fmtDateLong(comp.date)), el('h1', { class: 'mt-0' }, comp.name)]),
     el('div', { class: 'page-actions' }, [
       el('button', { class: 'btn btn-ghost', onclick: () => openCompModal(comp, () => renderDetail(container, compId) & clear(container)) }, 'Bearbeiten'),
-      el('button', { class: 'btn btn-danger', onclick: () => confirmAction('Diesen Wettkampf inkl. aller Ergebnisse löschen?', async () => { await remove('competitions', compId); for (const r of compResults) await remove('results', r.id); toast('Wettkampf gelöscht'); navigate('competitions'); }) }, 'Löschen'),
+      el('button', { class: 'btn btn-danger', onclick: () => confirmAction('Diesen Wettkampf inkl. aller Ergebnisse und Startlisteneinträge löschen?', async () => { await remove('competitions', compId); for (const r of compResults) await remove('results', r.id); for (const en of compEntries) await remove('entries', en.id); toast('Wettkampf gelöscht'); navigate('competitions'); }) }, 'Löschen'),
     ]),
   ]));
   wrap.appendChild(laneWave());
@@ -104,9 +103,100 @@ async function renderDetail(container, compId) {
     card.appendChild(el('div', { class: 'table-wrap' }, table));
   }
   wrap.appendChild(card);
+
+  const startListCard = el('div', { class: 'card' }, [
+    el('div', { class: 'flex justify-between items-center mb-16' }, [
+      el('h3', { class: 'mt-0' }, 'Startliste'),
+      el('button', { class: 'btn btn-accent btn-sm', onclick: () => openEntryModal(null, comp, athletes, refreshDetail) }, '+ Startlisteneintrag anlegen'),
+    ]),
+  ]);
+  if (compEntries.length === 0) {
+    startListCard.appendChild(el('p', {}, 'Noch keine Startlisteneinträge für diesen Wettkampf. Lege Wettkampfnummer, Lauf und Startbahn je Athlet:in/Disziplin an.'));
+  } else {
+    const groups = groupByHeat(compEntries);
+    const heatKeys = Object.keys(groups).sort((a, b) => a === '__none__' ? 1 : b === '__none__' ? -1 : Number(a) - Number(b));
+    heatKeys.forEach(key => {
+      startListCard.appendChild(el('h4', { style: 'margin:18px 0 8px' }, key === '__none__' ? 'Ohne Lauf zugewiesen' : `Lauf ${key}`));
+      const table = el('table');
+      table.appendChild(el('thead', {}, el('tr', {}, [
+        el('th', {}, 'Bahn'), el('th', {}, 'Nr.'), el('th', {}, 'Athlet:in'), el('th', {}, 'Disziplin'),
+        el('th', {}, 'Meldezeit'), el('th', {}, 'Ergebniszeit'), el('th', {}, 'Platz'), el('th', {}, ''),
+      ])));
+      const tbody = el('tbody');
+      groups[key].sort((a, b) => (a.lane ?? 99) - (b.lane ?? 99)).forEach(entry => {
+        tbody.appendChild(buildEntryRow(entry, comp, athletes, results, refreshDetail));
+      });
+      table.appendChild(tbody);
+      startListCard.appendChild(el('div', { class: 'table-wrap mb-8' }, table));
+    });
+  }
+  wrap.appendChild(startListCard);
+
   container.appendChild(wrap);
 
   async function refreshDetail() { clear(container); renderDetail(container, compId); }
+}
+
+function groupByHeat(entries) {
+  const groups = {};
+  entries.forEach(e => {
+    const key = e.heat != null && e.heat !== '' ? String(e.heat) : '__none__';
+    (groups[key] ||= []).push(e);
+  });
+  return groups;
+}
+
+function findResultForEntry(results, entry) {
+  return results.find(r => r.competitionId === entry.competitionId && r.athleteId === entry.athleteId && r.event === entry.event) || null;
+}
+
+// One start-list row: shows lane/number/athlete/event/seed time, plus an
+// inline time field + "speichern" button for quick result capture — this
+// writes straight into the 'results' store (same one used everywhere else
+// in the app), so a captured time immediately shows up in Zeiten & Statistiken.
+function buildEntryRow(entry, comp, athletes, results, onChanged) {
+  const athlete = athletes.find(a => a.id === entry.athleteId);
+  const existingResult = findResultForEntry(results, entry);
+
+  const timeInput = textInput(existingResult ? secToTime(existingResult.time) : '', { placeholder: 'mm:ss.cc', style: 'width:100px' });
+  const saveBtn = el('button', { class: 'btn btn-accent btn-sm', title: 'Zeit speichern', onclick: async () => {
+    const sec = timeToSec(timeInput.value);
+    if (!sec || isNaN(sec)) { toast('Bitte eine gültige Zeit angeben.', 'error'); return; }
+    const others = results.filter(r => r.athleteId === entry.athleteId && r.event === entry.event && r.id !== existingResult?.id);
+    const isPB = others.length === 0 || others.every(r => sec < r.time);
+    await put('results', {
+      ...(existingResult || {}), athleteId: entry.athleteId, event: entry.event, time: sec,
+      date: comp.date, course: comp.course, competitionId: comp.id, isPB,
+      place: existingResult?.place ?? null,
+    });
+    toast(isPB ? 'Ergebnis gespeichert — neue persönliche Bestzeit!' : 'Ergebnis gespeichert');
+    onChanged();
+  } });
+  timeInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); saveBtn.click(); } });
+
+  const placeInput = el('input', {
+    type: 'number', min: '1', value: existingResult?.place ?? '', style: 'width:56px', title: 'Platzierung',
+    onchange: async (e) => {
+      if (!existingResult) { toast('Bitte zuerst eine Ergebniszeit erfassen.', 'error'); e.target.value = ''; return; }
+      await put('results', { ...existingResult, place: e.target.value ? parseInt(e.target.value) : null });
+      onChanged();
+    },
+  });
+
+  return el('tr', {}, [
+    el('td', { class: 'data' }, entry.lane != null ? String(entry.lane) : '—'),
+    el('td', { class: 'data' }, entry.eventNumber || '—'),
+    el('td', {}, fullName(athlete)),
+    el('td', {}, entry.event),
+    el('td', { class: 'data' }, entry.seedTime ? secToTime(entry.seedTime) : '—'),
+    el('td', {}, [timeInput, ' ', saveBtn, existingResult?.isPB ? ' ' : null, existingResult?.isPB ? badge('PB', 'pb') : null]),
+    el('td', {}, placeInput),
+    el('td', {}, [
+      el('button', { class: 'btn btn-ghost btn-sm', onclick: () => openEntryModal(entry, comp, athletes, onChanged) }, 'Bearbeiten'),
+      ' ',
+      el('button', { class: 'btn btn-danger btn-sm', onclick: () => confirmAction('Diesen Startlisteneintrag entfernen? (Bereits erfasste Ergebniszeiten bleiben erhalten.)', async () => { await remove('entries', entry.id); toast('Eintrag entfernt'); onChanged(); }) }, 'Entfernen'),
+    ]),
+  ]);
 }
 
 function openCompModal(comp, onSaved) {
@@ -137,6 +227,41 @@ function openCompModal(comp, onSaved) {
   const { close } = openModal({ title: isEdit ? 'Wettkampf bearbeiten' : 'Wettkampf anlegen', bodyNode: form, wide: true });
 }
 
+function openEntryModal(entry, comp, athletes, onSaved) {
+  const isEdit = !!entry;
+  const data = entry ? { ...entry } : { competitionId: comp.id, athleteId: athletes[0]?.id || '', event: EVENTS[0], eventNumber: '', heat: '', lane: '', seedTime: null };
+  const form = el('form', { class: 'form-grid' });
+  const fAthlete = selectInput(athletes.map(a => ({ value: a.id, label: fullName(a) })), data.athleteId);
+  const fEvent = selectInput(EVENTS.map(e => ({ value: e, label: e })), data.event);
+  const fNr = textInput(data.eventNumber || '', { placeholder: 'z. B. 12' });
+  const fHeat = el('input', { type: 'number', min: '1', value: data.heat ?? '', placeholder: 'z. B. 3' });
+  const fLane = el('input', { type: 'number', min: '1', max: '10', value: data.lane ?? '', placeholder: 'z. B. 4' });
+  const fSeed = textInput(data.seedTime ? secToTime(data.seedTime) : '', { placeholder: 'mm:ss.cc (optional)' });
+  form.appendChild(field('Athlet:in', fAthlete, { span2: true }));
+  form.appendChild(field('Disziplin', fEvent));
+  form.appendChild(field('Wettkampfnummer', fNr, { hint: 'Nr. laut Ausschreibung' }));
+  form.appendChild(field('Lauf', fHeat));
+  form.appendChild(field('Startbahn', fLane));
+  form.appendChild(field('Meldezeit', fSeed, { hint: 'optional, z. B. 1:02.35' }));
+  form.appendChild(el('div', { class: 'form-actions', style: 'grid-column:1/-1' }, [
+    el('button', { type: 'button', class: 'btn btn-ghost', onclick: () => close() }, 'Abbrechen'),
+    el('button', { type: 'submit', class: 'btn btn-primary' }, isEdit ? 'Speichern' : 'Anlegen'),
+  ]));
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const seedSec = fSeed.value.trim() ? timeToSec(fSeed.value) : null;
+    if (fSeed.value.trim() && (!seedSec || isNaN(seedSec))) { toast('Bitte eine gültige Meldezeit angeben oder leer lassen.', 'error'); return; }
+    await put('entries', {
+      ...data, competitionId: comp.id, athleteId: fAthlete.value, event: fEvent.value,
+      eventNumber: fNr.value.trim(), heat: fHeat.value ? parseInt(fHeat.value) : null,
+      lane: fLane.value ? parseInt(fLane.value) : null, seedTime: seedSec,
+    });
+    toast(isEdit ? 'Änderungen gespeichert' : 'Startlisteneintrag angelegt');
+    close(); onSaved?.();
+  });
+  const { close } = openModal({ title: isEdit ? 'Startlisteneintrag bearbeiten' : 'Startlisteneintrag anlegen', bodyNode: form, wide: true });
+}
+
 function openResultModal(result, comp, athletes, onSaved) {
   const isEdit = !!result;
   const data = result ? { ...result } : { athleteId: athletes[0]?.id || '', event: EVENTS[0], time: '', place: '', isPB: false, date: comp.date, competitionId: comp.id, course: comp.course };
@@ -150,7 +275,7 @@ function openResultModal(result, comp, athletes, onSaved) {
   form.appendChild(field('Disziplin', fEvent));
   form.appendChild(field('Zeit', fTime, { hint: 'z. B. 1:02.35 oder 28.90' }));
   form.appendChild(field('Platz', fPlace));
-  //form.appendChild(field('Persönliche Bestzeit?', el('div', { class: 'flex items-center gap-8' }, [fPB, el('span', { class: 'text-sm' }, 'ja, neue PB')])));
+  form.appendChild(field('Persönliche Bestzeit?', el('div', { class: 'flex items-center gap-8' }, [fPB, el('span', { class: 'text-sm' }, 'ja, neue PB'])])));
   form.appendChild(el('div', { class: 'form-actions', style: 'grid-column:1/-1' }, [
     el('button', { type: 'button', class: 'btn btn-ghost', onclick: () => close() }, 'Abbrechen'),
     el('button', { type: 'submit', class: 'btn btn-primary' }, 'Speichern'),
