@@ -3,7 +3,7 @@
 // ============================================================
 import { getAll, put, remove, uid } from '../db.js';
 import { el, clear, field, textInput, openModal, confirmAction, toast, badge, emptyState, laneWave } from '../utils.js';
-import { renderSetEditor, totalDistance } from './setEditor.js';
+import { renderSetEditor, totalDistance, cloneItems } from './setEditor.js';
 
 export const templatesModule = {
   id: 'templates',
@@ -38,9 +38,18 @@ function renderList(container, templates, exercises) {
       el('div', { class: 'pill-group mb-8' }, (t.tags || []).map(tag => badge(tag, 'neutral'))),
     ]);
     const list = el('div', { class: 'mb-8' });
-    (t.sets || []).forEach(s => list.appendChild(el('div', { class: 'list-row' }, [
-      el('span', { style: 'flex:1' }, s.description || '—'), el('span', { class: 'data text-sm' }, `${s.reps}× ${s.distance ?? '—'}m`),
-    ])));
+    (t.sets || []).forEach(entry => {
+      if (entry.kind === 'block') {
+        list.appendChild(el('div', { class: 'list-row' }, [
+          el('span', { style: 'flex:1' }, [badge(`${entry.repeatCount || 1}×`, 'progress'), ' ', entry.label || 'Wiederholungsblock', el('span', { class: 'hint' }, ` (${(entry.sets || []).length} Sätze)`)]),
+          el('span', { class: 'data text-sm' }, `${totalDistance(entry.sets || []) * (entry.repeatCount || 1)}m`),
+        ]));
+      } else {
+        list.appendChild(el('div', { class: 'list-row' }, [
+          el('span', { style: 'flex:1' }, entry.description || '—'), el('span', { class: 'data text-sm' }, `${entry.reps}× ${entry.distance ?? '—'}m`),
+        ]));
+      }
+    });
     card.appendChild(list);
     card.appendChild(el('div', { class: 'flex gap-8' }, [
       el('button', { class: 'btn btn-ghost btn-sm', onclick: () => openTemplateModal(t, exercises, refresh) }, 'Bearbeiten'),
@@ -54,7 +63,7 @@ function renderList(container, templates, exercises) {
 
 function openTemplateModal(template, exercises, onSaved) {
   const isEdit = !!template;
-  const data = template ? { ...template, sets: (template.sets || []).map(s => ({ ...s })) } : { name: '', description: '', tags: [], sets: [] };
+  const data = template ? { ...template, sets: cloneItems(template.sets) } : { name: '', description: '', tags: [], sets: [] };
   const form = el('form', { class: 'form-grid single' });
   const fName = textInput(data.name, { required: true });
   const fDesc = el('textarea', {}, data.description || '');
