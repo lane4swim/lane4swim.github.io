@@ -8,7 +8,7 @@ Laden keine Internetverbindung mehr.
 ## Funktionsumfang
 
 - **Athleten- & Teammanagement** — Profile, Trainingsgruppen
-- **Wettkampfmanagement** — Wettkämpfe, Ergebnisse
+- **Wettkampfmanagement** — Wettkämpfe, Startlisten (Wettkampfnummer, Lauf, Startbahn) und Ergebniserfassung
 - **Zeiten- & Leistungserfassung** — Bestzeiten, Verlaufsdiagramme
 - **Trainingspläne** — Wochenkalender mit Sets/Serien **und Wiederholungsblöcken** (z. B. „3× [2×25 Sprint, 50 locker]“), aus Vorlagen erstellbar
 - **Wiederverwendbare Vorlagen** für Trainingspläne
