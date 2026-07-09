@@ -75,32 +75,67 @@ async function renderDetail(container, planId) {
         badge(`${totalDistance(day.sets || [])} m`, 'neutral'),
       ]),
     ]);
-    if (!day.sets || day.sets.length === 0) dayCard.appendChild(el('p', {}, 'Keine Sätze geplant.'));
-    else {
-      const table = el('table');
-      table.appendChild(el('thead', {}, el('tr', {}, [el('th', {}, 'Beschreibung'), el('th', {}, 'Distanz'), el('th', {}, 'Wdh.'), el('th', {}, 'Pause')])));
-      const tbody = el('tbody');
-      day.sets.forEach(entry => {
-        if (entry.kind === 'block') {
-          const innerDist = totalDistance(entry.sets || []);
-          tbody.appendChild(el('tr', { style: 'background:var(--c-foam-2)' }, [
-            el('td', { colspan: '3' }, [badge(`${entry.repeatCount || 1}×`, 'progress'), ' ', el('strong', {}, entry.label || 'Wiederholungsblock')]),
-            el('td', {}, `${innerDist * (entry.repeatCount || 1)} m`),
-          ]));
-          (entry.sets || []).forEach(s => tbody.appendChild(el('tr', {}, [
-            el('td', { style: 'padding-left:24px' }, `↳ ${s.description || '—'}`), el('td', {}, `${s.distance ?? '—'} m`), el('td', {}, s.reps), el('td', {}, `${s.restSec || 0}s`),
-          ])));
-        } else {
-          tbody.appendChild(el('tr', {}, [el('td', {}, entry.description || '—'), el('td', {}, `${entry.distance ?? '—'} m`), el('td', {}, entry.reps), el('td', {}, `${entry.restSec || 0}s`)]));
-        }
-      });
-      table.appendChild(tbody);
-      dayCard.appendChild(el('div', { class: 'table-wrap' }, table));
-    }
+    dayCard.appendChild(renderDayItems(day.sets || []));
     wrap.appendChild(dayCard);
   });
 
   container.appendChild(wrap);
+}
+
+// Renders a day's sets/blocks for read-only display. Consecutive plain
+// sets are grouped into one table (as before); a repeat block interrupts
+// the table and is shown as its own distinct box — same visual language
+// (dashed border, "Wiederholungsblock" badge) as the editor uses, so the
+// reading view and the editing view stay recognizably consistent.
+function renderDayItems(items) {
+  const host = el('div');
+  if (items.length === 0) { host.appendChild(el('p', {}, 'Keine Sätze geplant.')); return host; }
+
+  let pendingRows = [];
+  function flushTable() {
+    if (pendingRows.length === 0) return;
+    const table = el('table');
+    table.appendChild(el('thead', {}, el('tr', {}, [el('th', {}, 'Beschreibung'), el('th', {}, 'Distanz'), el('th', {}, 'Wdh.'), el('th', {}, 'Pause')])));
+    const tbody = el('tbody');
+    pendingRows.forEach(row => tbody.appendChild(row));
+    table.appendChild(tbody);
+    host.appendChild(el('div', { class: 'table-wrap mb-8' }, table));
+    pendingRows = [];
+  }
+
+  items.forEach(entry => {
+    if (entry.kind === 'block') {
+      flushTable();
+      host.appendChild(renderBlockBox(entry));
+    } else {
+      pendingRows.push(el('tr', {}, [
+        el('td', {}, entry.description || '—'), el('td', {}, `${entry.distance ?? '—'} m`), el('td', {}, entry.reps), el('td', {}, `${entry.restSec || 0}s`),
+      ]));
+    }
+  });
+  flushTable();
+  return host;
+}
+
+function renderBlockBox(block) {
+  const innerDist = totalDistance(block.sets || []);
+  const box = el('div', { class: 'day-block', style: 'margin:4px 0 12px;border-style:dashed;border-color:var(--c-chlorine-d);background:var(--c-foam-2)' });
+  box.appendChild(el('div', { class: 'day-block-head' }, [
+    el('div', { class: 'flex items-center gap-8' }, [badge(`${block.repeatCount || 1}× Wiederholung`, 'progress'), el('strong', {}, block.label || 'Wiederholungsblock')]),
+    badge(`${innerDist * (block.repeatCount || 1)} m gesamt`, 'neutral'),
+  ]));
+  if (!block.sets || block.sets.length === 0) {
+    box.appendChild(el('p', { class: 'hint mt-0' }, 'Keine Sätze in diesem Block.'));
+  } else {
+    const table = el('table');
+    table.appendChild(el('thead', {}, el('tr', {}, [el('th', {}, 'Beschreibung'), el('th', {}, 'Distanz'), el('th', {}, 'Wdh.'), el('th', {}, 'Pause')])));
+    const tbody = el('tbody');
+    block.sets.forEach(s => tbody.appendChild(el('tr', {}, [el('td', {}, s.description || '—'), el('td', {}, `${s.distance ?? '—'} m`), el('td', {}, s.reps), el('td', {}, `${s.restSec || 0}s`)])));
+    table.appendChild(tbody);
+    box.appendChild(el('div', { class: 'table-wrap' }, table));
+  }
+  box.appendChild(el('div', { class: 'hint', style: 'margin-top:8px;margin-bottom:0' }, `${innerDist} m je Durchgang × ${block.repeatCount || 1} Wiederholungen = ${innerDist * (block.repeatCount || 1)} m`));
+  return box;
 }
 
 function openPlanModal(plan, groups, templates, exercises, onSaved) {
