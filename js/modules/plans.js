@@ -7,7 +7,7 @@ import {
   emptyState, laneWave, fmtDateLong, fmtDateShort, todayISO, isoAddDays, startOfWeek,
 } from '../utils.js';
 import { WEEKDAYS } from '../refdata.js';
-import { renderSetEditor, totalDistance } from './setEditor.js';
+import { renderSetEditor, totalDistance, cloneItems } from './setEditor.js';
 import { navigate } from '../router.js';
 
 export const plansModule = {
@@ -80,7 +80,20 @@ async function renderDetail(container, planId) {
       const table = el('table');
       table.appendChild(el('thead', {}, el('tr', {}, [el('th', {}, 'Beschreibung'), el('th', {}, 'Distanz'), el('th', {}, 'Wdh.'), el('th', {}, 'Pause')])));
       const tbody = el('tbody');
-      day.sets.forEach(s => tbody.appendChild(el('tr', {}, [el('td', {}, s.description || '—'), el('td', {}, `${s.distance ?? '—'} m`), el('td', {}, s.reps), el('td', {}, `${s.restSec || 0}s`)])));
+      day.sets.forEach(entry => {
+        if (entry.kind === 'block') {
+          const innerDist = totalDistance(entry.sets || []);
+          tbody.appendChild(el('tr', { style: 'background:var(--c-foam-2)' }, [
+            el('td', { colspan: '3' }, [badge(`${entry.repeatCount || 1}×`, 'progress'), ' ', el('strong', {}, entry.label || 'Wiederholungsblock')]),
+            el('td', {}, `${innerDist * (entry.repeatCount || 1)} m`),
+          ]));
+          (entry.sets || []).forEach(s => tbody.appendChild(el('tr', {}, [
+            el('td', { style: 'padding-left:24px' }, `↳ ${s.description || '—'}`), el('td', {}, `${s.distance ?? '—'} m`), el('td', {}, s.reps), el('td', {}, `${s.restSec || 0}s`),
+          ])));
+        } else {
+          tbody.appendChild(el('tr', {}, [el('td', {}, entry.description || '—'), el('td', {}, `${entry.distance ?? '—'} m`), el('td', {}, entry.reps), el('td', {}, `${entry.restSec || 0}s`)]));
+        }
+      });
       table.appendChild(tbody);
       dayCard.appendChild(el('div', { class: 'table-wrap' }, table));
     }
@@ -92,7 +105,7 @@ async function renderDetail(container, planId) {
 
 function openPlanModal(plan, groups, templates, exercises, onSaved) {
   const isEdit = !!plan;
-  const data = plan ? { ...plan, days: (plan.days || []).map(d => ({ ...d, sets: d.sets.map(s => ({ ...s })) })) } : {
+  const data = plan ? { ...plan, days: (plan.days || []).map(d => ({ ...d, sets: cloneItems(d.sets) })) } : {
     name: `Trainingswoche ${startOfWeek(todayISO())}`, weekStart: startOfWeek(todayISO()), groupId: groups[0]?.id || '', status: 'aktiv', days: [],
   };
   const form = el('form', { class: 'form-grid single' });
@@ -134,7 +147,7 @@ function openPlanModal(plan, groups, templates, exercises, onSaved) {
   addRow.appendChild(el('button', { type: 'button', class: 'btn btn-accent btn-sm', onclick: () => {
     const tpl = templates.find(t => t.id === templateSel.value);
     const nextDate = data.days.length ? isoAddDays(data.days[data.days.length - 1].date, 1) : fWeek.value || todayISO();
-    data.days.push({ date: nextDate, sets: tpl ? tpl.sets.map(s => ({ ...s, id: uid('set') })) : [] });
+    data.days.push({ date: nextDate, sets: tpl ? cloneItems(tpl.sets) : [] });
     drawDays();
   } }, '+ Trainingstag hinzufügen'));
   daysWrap.appendChild(addRow);
