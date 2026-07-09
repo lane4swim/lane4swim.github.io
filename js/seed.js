@@ -82,31 +82,43 @@ async function seedDemoData() {
     id: id(), name: 'Grundlagenausdauer – Standardwoche', description: 'Klassische GA1/GA2-Einheit für die Basisperiode.',
     tags: ['ausdauer', 'basis'],
     sets: [
-      { id: id(), order: 1, description: 'Einschwimmen gemischt', distance: 400, reps: 1, intensity: 'locker', restSec: 0 },
-      { id: id(), order: 2, description: '8x100 Freistil', distance: 100, reps: 8, intensity: 'ga1', restSec: 20 },
-      { id: id(), order: 3, description: '4x50 Beine', distance: 50, reps: 4, intensity: 'locker', restSec: 15 },
-      { id: id(), order: 4, description: 'Ausschwimmen', distance: 200, reps: 1, intensity: 'locker', restSec: 0 },
+      { kind: 'set', id: id(), description: 'Einschwimmen gemischt', distance: 400, reps: 1, intensity: 'locker', restSec: 0 },
+      { kind: 'set', id: id(), description: '8x100 Freistil', distance: 100, reps: 8, intensity: 'ga1', restSec: 20 },
+      { kind: 'set', id: id(), description: '4x50 Beine', distance: 50, reps: 4, intensity: 'locker', restSec: 15 },
+      { kind: 'set', id: id(), description: 'Ausschwimmen', distance: 200, reps: 1, intensity: 'locker', restSec: 0 },
     ],
   };
   const template2 = {
     id: id(), name: 'Sprint & Wenden', description: 'Kurze, intensive Serien mit Fokus auf Renntempo.',
     tags: ['sprint', 'wettkampf'],
     sets: [
-      { id: id(), order: 1, description: 'Einschwimmen', distance: 300, reps: 1, intensity: 'locker', restSec: 0 },
-      { id: id(), order: 2, description: '6x25 Sprint ab Wende', distance: 25, reps: 6, intensity: 'sprint', restSec: 45 },
-      { id: id(), order: 3, description: '4x50 Renntempo', distance: 50, reps: 4, intensity: 'renotempo', restSec: 40 },
-      { id: id(), order: 4, description: 'Ausschwimmen locker', distance: 150, reps: 1, intensity: 'locker', restSec: 0 },
+      { kind: 'set', id: id(), description: 'Einschwimmen', distance: 300, reps: 1, intensity: 'locker', restSec: 0 },
+      {
+        kind: 'block', id: id(), label: 'Hauptserie Sprint', repeatCount: 3,
+        sets: [
+          { kind: 'set', id: id(), description: '2x25 Sprint ab Wende', distance: 25, reps: 2, intensity: 'sprint', restSec: 30 },
+          { kind: 'set', id: id(), description: '50 locker ausschwimmen', distance: 50, reps: 1, intensity: 'locker', restSec: 20 },
+        ],
+      },
+      { kind: 'set', id: id(), description: '4x50 Renntempo', distance: 50, reps: 4, intensity: 'renotempo', restSec: 40 },
+      { kind: 'set', id: id(), description: 'Ausschwimmen locker', distance: 150, reps: 1, intensity: 'locker', restSec: 0 },
     ],
   };
   await bulkPut('templates', [template1, template2]);
+
+  function cloneSets(sets) {
+    return sets.map(s => s.kind === 'block'
+      ? { ...s, id: id(), sets: (s.sets || []).map(x => ({ ...x, id: id() })) }
+      : { ...s, id: id() });
+  }
 
   const wkStart = startOfWeek(todayISO());
   const plan1 = {
     id: id(), name: 'Trainingswoche ' + wkStart, weekStart: wkStart, groupId: groupA.id, status: 'aktiv',
     days: [
-      { date: wkStart, sets: template1.sets.map(s => ({ ...s, id: id() })) },
-      { date: isoAddDays(wkStart, 2), sets: template2.sets.map(s => ({ ...s, id: id() })) },
-      { date: isoAddDays(wkStart, 4), sets: template1.sets.map(s => ({ ...s, id: id() })) },
+      { date: wkStart, sets: cloneSets(template1.sets) },
+      { date: isoAddDays(wkStart, 2), sets: cloneSets(template2.sets) },
+      { date: isoAddDays(wkStart, 4), sets: cloneSets(template1.sets) },
     ],
   };
   await bulkPut('plans', [plan1]);
