@@ -275,7 +275,7 @@ function openResultModal(result, comp, athletes, onSaved) {
   form.appendChild(field('Disziplin', fEvent));
   form.appendChild(field('Zeit', fTime, { hint: 'z. B. 1:02.35 oder 28.90' }));
   form.appendChild(field('Platz', fPlace));
-  form.appendChild(field('Persönliche Bestzeit?', el('div', { class: 'flex items-center gap-8' }, [fPB, el('span', { class: 'text-sm' }, 'ja, neue PB'])])));
+  form.appendChild(field('Persönliche Bestzeit?', el('div', { class: 'flex items-center gap-8' }, [fPB, el('span', { class: 'text-sm' }, 'ja, neue PB')])));
   form.appendChild(el('div', { class: 'form-actions', style: 'grid-column:1/-1' }, [
     el('button', { type: 'button', class: 'btn btn-ghost', onclick: () => close() }, 'Abbrechen'),
     el('button', { type: 'submit', class: 'btn btn-primary' }, 'Speichern'),
