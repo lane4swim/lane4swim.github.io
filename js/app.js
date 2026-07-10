@@ -19,9 +19,10 @@ import { sessionsModule } from './modules/sessions.js';
 import { actionItemsModule } from './modules/actionItems.js';
 import { statsModule } from './modules/stats.js';
 import { syncQueueModule } from './modules/syncQueue.js';
+import { profileModule } from './modules/profile.js';
 
 [dashboardModule, athletesModule, competitionsModule, timesModule, plansModule,
-  templatesModule, catalogModule, sessionsModule, actionItemsModule, statsModule, syncQueueModule]
+  templatesModule, catalogModule, sessionsModule, actionItemsModule, statsModule, syncQueueModule, profileModule]
   .forEach(registerModule);
 
 const viewEl = document.getElementById('view');
