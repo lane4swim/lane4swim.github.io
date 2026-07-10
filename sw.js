@@ -6,7 +6,7 @@
 // Bump CACHE_VERSION whenever any cached file changes so clients
 // pick up the new version instead of serving stale assets.
 // ============================================================
-const CACHE_VERSION = 'lane1-v5';
+const CACHE_VERSION = 'lane1-v6';
 const PRECACHE_URLS = [
   './',
   './index.html',
@@ -19,6 +19,9 @@ const PRECACHE_URLS = [
   './js/utils.js',
   './js/refdata.js',
   './js/seed.js',
+  './js/i18n.js',
+  './js/i18n/de-DE.js',
+  './js/i18n/en-US.js',
   './js/modules/dashboard.js',
   './js/modules/athletes.js',
   './js/modules/competitions.js',
