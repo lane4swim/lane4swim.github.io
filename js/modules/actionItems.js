@@ -5,7 +5,7 @@
 import { getAll, put, remove } from '../db.js';
 import {
   el, clear, field, textInput, selectInput, openModal, confirmAction, toast, badge,
-  emptyState, laneWave, fmtDateShort, todayISO, fullName,
+  emptyState, laneWave, fmtDateShort, todayISO, fullName, beginRender,
 } from '../utils.js';
 import { ACTION_CATEGORIES, ACTION_STATUS } from '../refdata.js';
 import { getRole, getCurrentUser } from '../state.js';
@@ -17,8 +17,10 @@ export const actionItemsModule = {
   roles: ['trainer', 'admin', 'athlete'],
   icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="0.6" fill="currentColor"/></svg>`,
   async render(container, params) {
+    const isCurrent = beginRender(container);
     clear(container);
     const [items, athletes] = await Promise.all([getAll('actionItems'), getAll('athletes')]);
+    if (!isCurrent()) return;
     const role = getRole();
     if (role === 'athlete') {
       const user = getCurrentUser();
