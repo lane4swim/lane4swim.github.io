@@ -2,10 +2,9 @@
 // modules/times.js — Zeiten- und Leistungserfassung
 // ============================================================
 import { getAll, put, remove } from '../db.js';
-import {
-  el, clear, fullName, fmtDateShort, todayISO, field, textInput, selectInput,
+import { el, clear, fullName, fmtDateShort, todayISO, field, textInput, selectInput,
   openModal, confirmAction, toast, badge, emptyState, laneWave, secToTime, timeToSec,
-  groupBy, svgLineChart,
+  groupBy, svgLineChart, beginRender,
 } from '../utils.js';
 import { EVENTS, COURSES } from '../refdata.js';
 import { t, trCode, trOptions, trOptionsFlat } from '../i18n.js';
@@ -15,8 +14,10 @@ export const timesModule = {
   roles: ['trainer', 'admin', 'athlete'],
   icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2"/><path d="M9 2h6"/><path d="M12 2v3"/></svg>`,
   async render(container) {
+    const isCurrent = beginRender(container);
     clear(container);
     const [athletes, results] = await Promise.all([getAll('athletes'), getAll('results')]);
+    if (!isCurrent()) return;
     renderView(container, athletes, results);
   }
 };
