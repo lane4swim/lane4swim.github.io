@@ -4,7 +4,7 @@
 import { getAll } from '../db.js';
 import {
   el, clear, field, selectInput, badge, emptyState, laneWave, fullName,
-  groupBy, average, secToTime, svgBarChart, svgLineChart, todayISO, isoAddDays, fmtDateShort,
+  groupBy, average, secToTime, svgBarChart, svgLineChart, todayISO, isoAddDays, fmtDateShort, beginRender,
 } from '../utils.js';
 import { EVENTS } from '../refdata.js';
 import { t, trCode, trOptionsFlat } from '../i18n.js';
@@ -14,8 +14,10 @@ export const statsModule = {
   roles: ['trainer', 'admin'],
   icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>`,
   async render(container) {
+    const isCurrent = beginRender(container);
     clear(container);
     const [athletes, results, sessions, groups] = await Promise.all(['athletes', 'results', 'sessions', 'groups'].map(getAll));
+    if (!isCurrent()) return;
     renderView(container, athletes, results, sessions, groups);
   }
 };
