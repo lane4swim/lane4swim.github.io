@@ -17,6 +17,7 @@ Laden keine Internetverbindung mehr.
 - **Handlungsfelder** — dokumentierte Entwicklungsziele je Athlet:in mit Status
 - **Statistiken & Auswertungen** — Anwesenheitsquote, RPE-Trend, Leistungsentwicklung
 - **Sync-Warteschlange** — Event-Queue (Outbox-Pattern) zur Vorbereitung einer künftigen Backend-Synchronisation, inkl. simulierter Übertragung in der Demo
+- **Mehrsprachigkeit** — Deutsch (de-DE) und Englisch (en-US) von Anfang an, Sprachumschalter in der Kopfzeile, pro Nutzer:in gespeichert, leicht um weitere Sprachen erweiterbar
 
 Drei Rollen: **Trainer**, **Athlet** und **Administrator** (siehe unten).
 
@@ -51,11 +52,16 @@ Gruppen, ein Wettkampf, Übungen, ein Trainingsplan). Über das
 Auswahlfeld oben rechts kann zwischen drei Demo-Konten gewechselt
 werden:
 
-| Konto | Rolle | Sichtbare Bereiche |
-|---|---|---|
-| Sabine Reuter | Trainer:in | Alle Bereiche außer reinen Athleten-Ansichten |
-| Team-Administrator | Administrator | Alle Bereiche |
-| Mara Vogel | Athlet:in | Dashboard, Zeiten, Trainingspläne, Einheiten, eigene Handlungsfelder |
+| Konto | Rolle | Sichtbare Bereiche | Sprache |
+|---|---|---|---|
+| Sabine Reuter | Trainer:in | Alle Bereiche außer reinen Athleten-Ansichten | de-DE |
+| Team-Administrator | Administrator | Alle Bereiche | de-DE |
+| Mara Vogel | Athlet:in | Dashboard, Zeiten, Trainingspläne, Einheiten, eigene Handlungsfelder | en-US |
+
+Die Spalte „Sprache" zeigt bewusst unterschiedliche Werte: Mara Vogels
+Konto ist auf Englisch voreingestellt, damit die Mehrsprachigkeit beim
+Kontowechsel sofort sichtbar wird (Oberfläche wechselt automatisch
+mit dem Konto — siehe Abschnitt „Mehrsprachigkeit" unten).
 
 Da die App bewusst ohne Server/Backend läuft, ist "Anmelden" hier ein
 einfacher Profil-Wechsler — für einen echten Mehrbenutzerbetrieb über
@@ -75,10 +81,13 @@ Daten als JSON exportieren oder auf die Demo-Daten zurücksetzen.
   siehe unten) — Seed-/Import-Daten über `bulkPut()` lösen bewusst
   **keine** Sync-Events aus, da sie keine echte Nutzeraktion sind.
 - **`js/router.js`** — minimaler Hash-Router mit Modul-Registry.
-  Jedes Feature ist ein Modul mit `{ id, label, icon, roles, render() }`.
-  Neue Module registrieren sich in `js/app.js` und erscheinen automatisch
-  in Navigation (Desktop-Seitenleiste & Mobile-Tableiste), inkl.
-  Rollenfilterung über `roles`.
+  Jedes Feature ist ein Modul mit `{ id, icon, roles, render() }` (der
+  Navigationstext kommt über `t('nav.<id>')` aus dem i18n-System, nicht
+  als fest codierter String im Modul). Neue Module registrieren sich in
+  `js/app.js` und erscheinen automatisch in Navigation (Desktop-Seitenleiste
+  & Mobile-Tableiste), inkl. Rollenfilterung über `roles`.
+- **`js/i18n.js`** + **`js/i18n/de-DE.js`** / **`js/i18n/en-US.js`** —
+  Übersetzungs-Engine (siehe eigener Abschnitt „Mehrsprachigkeit" unten).
 - **`js/modules/*.js`** — ein Modul pro Fachbereich, lose gekoppelt
   über den Router (keine direkten Abhängigkeiten zwischen Modulen
   außer über `navigate()`).
@@ -100,7 +109,7 @@ Daten als JSON exportieren oder auf die Demo-Daten zurücksetzen.
 - Export/Import einzelner Bereiche (z. B. nur Übungskatalog) zum
   Teilen zwischen Vereinen.
 - Push-Benachrichtigungen für anstehende Einheiten/Wettkämpfe.
-- Mehrsprachigkeit (aktuell auf Deutsch ausgelegt).
+- Weitere Sprachen über zusätzliche `js/i18n/<locale>.js`-Dateien (siehe unten).
 
 ### Sync-Warteschlange (Event Queue / Outbox-Pattern)
 
@@ -127,6 +136,60 @@ tatsächlichen API-Aufruf ersetzt werden — die Datenstruktur der
 Warteschlange (`store`, `entityId`, `action`, `payload`) ist bereits
 so gehalten, dass sie sich 1:1 in typische REST-/GraphQL-Mutationen
 übersetzen lässt.
+
+## Mehrsprachigkeit (i18n)
+
+Die App liegt von Anfang an in zwei Sprachpaketen vor: **Deutsch
+(`de-DE`, Referenzsprache)** und **Englisch (`en-US`)**.
+
+**Sprachwahl im UI:** In der Kopfzeile, direkt links neben dem
+Konto-Auswahlfeld, sitzt ein kleines Sprach-Dropdown (🇩🇪/🇺🇸) — von
+überall in der App mit einem Klick erreichbar. Die Auswahl wirkt
+sofort auf die gesamte Oberfläche, ohne Neuladen.
+
+**Datenmodell:** Jeder Nutzer-Datensatz im Store `users` trägt ein
+Feld `locale` (z. B. `"de-DE"`, `"en-US"`) — die bevorzugte
+Anzeigesprache dieses Kontos. Beim Wechseln des Kontos (oben rechts)
+wechselt die Sprache automatisch mit; ändert man die Sprache über das
+Dropdown, wird sie im aktuell aktiven Nutzer-Datensatz gespeichert
+(`state.js: setUserLocale()`). Ohne bekannten Nutzer (z. B. ganz
+erster Start) wird zunächst die Browsersprache erkannt, sonst auf
+Deutsch zurückgefallen (`i18n.js: detectInitialLocale()`).
+
+**Architektur:**
+- **`js/i18n/de-DE.js`**, **`js/i18n/en-US.js`** — je ein flaches,
+  nach Modul benanntes Schlüssel-Objekt (`{ athletes: {...}, plans: {...}, refdata: {...}, ... }`).
+  `de-DE.js` ist die Referenz-/Fallback-Sprache; jeder neue Textschlüssel
+  sollte zuerst dort ergänzt werden.
+- **`js/i18n.js`** — die Engine: `t(key, vars)` löst einen Punkt-Pfad
+  wie `t('athletes.deleteConfirm', { name })` in der aktiven Sprache
+  auf, mit Fallback-Kette aktive Sprache → Deutsch → Schlüssel selbst
+  (damit ein fehlender Text nie zum Absturz führt, sondern bestenfalls
+  auffällt). `getAvailableLocales()` liefert die Liste fürs Dropdown.
+- **Referenzdaten (Disziplinen, Schwimmlagen, Kategorien, Status, …)**
+  bleiben in `js/refdata.js` unverändert als stabile, sprachunabhängige
+  Codes (z. B. `"100 Freistil"`, `"technik"`, `"offen"`) — das sind die
+  Werte, die tatsächlich in Athlet:innen, Ergebnissen, Plänen usw.
+  gespeichert werden. Für die Anzeige übersetzt `trCode()` /
+  `trLabel()` / `trOptions()` / `trOptionsFlat()` aus `i18n.js` diese
+  Codes just-in-time in die aktive Sprache. Ein Wechsel der
+  Anzeigesprache verändert also nie gespeicherte Daten, nur deren
+  Darstellung.
+- **`js/utils.js`** — `fmtDateLong()`/`fmtDateShort()` nutzen
+  `getLocale()` für `toLocaleDateString()`, Datumsformate passen sich
+  also ebenfalls an (z. B. `Mo., 12. Jan. 2026` vs. `Mon, Jan 12, 2026`).
+
+**Eine weitere Sprache hinzufügen** (z. B. Französisch):
+1. `js/i18n/de-DE.js` nach `js/i18n/fr-FR.js` kopieren (vollständigste
+   Vorlage) und alle Werte übersetzen — Schlüssel-Struktur unverändert lassen.
+2. In `js/i18n.js` im `LOCALES`-Objekt eine Zeile ergänzen:
+   `'fr-FR': { label: 'Français', flag: '🇫🇷', dict: fr_FR }` (plus den
+   passenden Import oben in der Datei).
+3. Fertig — das Sprach-Dropdown, alle `t()`-Aufrufe und die
+   Referenzdaten-Übersetzung (`refdata.*` im neuen Wörterbuch)
+   funktionieren automatisch, ohne dass ein anderes Modul angefasst
+   werden muss. Fehlt eine Übersetzung im neuen Sprachpaket, greift
+   automatisch der Deutsch-Fallback.
 
 ## Design
 
