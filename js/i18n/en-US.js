@@ -262,7 +262,7 @@ export default {
     fromCatalogHint: 'from exercise catalog: {name}', noSetsInBlock: 'No sets in this block yet.',
     blockSummary: 'Block distance: {inner} m per round × {n} = {total} m total',
     equipmentSummary: 'Equipment needed:', equipmentNone: 'No equipment needed',
-    editEquipment: 'Edit equipment',
+    editEquipment: 'Edit equipment', equipmentSaved: 'Equipment saved',
   },
   refdata: {
     courses: { LCM: 'LCM · 50m pool', SCM: 'SCM · 25m pool' },
