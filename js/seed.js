@@ -65,16 +65,16 @@ async function seedDemoData() {
   await bulkPut('results', resultSeed);
 
   const exercises = [
-    { name: 'Kraulbeine mit Brett', category: 'kick', stroke: 'Freistil', description: 'Beinarbeit isoliert mit Schwimmbrett, Fokus auf Hüftrotation.', defaultDistance: 200, tags: ['aufwärmen'] },
-    { name: '6-Schlag-Drill', category: 'technik', stroke: 'Freistil', description: 'Kraul mit betonter 6-Schlag-Beinachse pro Armzug.', defaultDistance: 100, tags: ['technik'] },
-    { name: 'Wendenserie', category: 'start-wende', stroke: 'Freistil', description: 'Kraulwenden mit Abstoß und Unterwasserphase, je 15m Anschwimmen.', defaultDistance: 25, tags: ['wende'] },
-    { name: 'Startsprünge', category: 'start-wende', stroke: 'Freistil', description: 'Blockstarts mit Reaktionszeitmessung, 15m Ausschwimmen.', defaultDistance: 15, tags: ['start'] },
-    { name: 'Brustbeinarbeit am Brett', category: 'kick', stroke: 'Brust', description: 'Isolierte Brustbeinarbeit, Fokus auf Peitschenbewegung.', defaultDistance: 200, tags: [] },
-    { name: 'Fahrtspiel 400', category: 'ausdauer', stroke: 'Freistil', description: '400m im Wechsel 50 locker / 50 zügig.', defaultDistance: 400, tags: ['ausdauer'] },
-    { name: 'Sprints 25m all-out', category: 'sprint', stroke: 'Freistil', description: 'Maximale Sprints mit voller Erholung dazwischen.', defaultDistance: 25, tags: ['sprint'] },
-    { name: 'Lagenwechsel-Drill', category: 'koordination', stroke: 'Lagen', description: '4x25 je Lage mit Fokus auf Übergänge.', defaultDistance: 100, tags: [] },
-    { name: 'Bilaterales Atmen', category: 'atmung', stroke: 'Freistil', description: 'Kraul mit Atmung alle 3 Züge zur Symmetrieschulung.', defaultDistance: 200, tags: ['technik'] },
-    { name: 'Trockenkraft Rumpf', category: 'kraft', stroke: null, description: 'Zirkel: Plank, Superman, Seitstütz, je 3 Runden.', defaultDistance: null, tags: ['land'] },
+    { name: 'Kraulbeine mit Brett', category: 'kick', stroke: 'Freistil', description: 'Beinarbeit isoliert mit Schwimmbrett, Fokus auf Hüftrotation.', defaultDistance: 200, tags: ['aufwärmen'], equipment: ['brett'] },
+    { name: '6-Schlag-Drill', category: 'technik', stroke: 'Freistil', description: 'Kraul mit betonter 6-Schlag-Beinachse pro Armzug.', defaultDistance: 100, tags: ['technik'], equipment: [] },
+    { name: 'Wendenserie', category: 'start-wende', stroke: 'Freistil', description: 'Kraulwenden mit Abstoß und Unterwasserphase, je 15m Anschwimmen.', defaultDistance: 25, tags: ['wende'], equipment: [] },
+    { name: 'Startsprünge', category: 'start-wende', stroke: 'Freistil', description: 'Blockstarts mit Reaktionszeitmessung, 15m Ausschwimmen.', defaultDistance: 15, tags: ['start'], equipment: ['startblock'] },
+    { name: 'Brustbeinarbeit am Brett', category: 'kick', stroke: 'Brust', description: 'Isolierte Brustbeinarbeit, Fokus auf Peitschenbewegung.', defaultDistance: 200, tags: [], equipment: ['brett'] },
+    { name: 'Fahrtspiel 400', category: 'ausdauer', stroke: 'Freistil', description: '400m im Wechsel 50 locker / 50 zügig.', defaultDistance: 400, tags: ['ausdauer'], equipment: [] },
+    { name: 'Sprints 25m all-out', category: 'sprint', stroke: 'Freistil', description: 'Maximale Sprints mit voller Erholung dazwischen.', defaultDistance: 25, tags: ['sprint'], equipment: ['paddles', 'kurzflossen'] },
+    { name: 'Lagenwechsel-Drill', category: 'koordination', stroke: 'Lagen', description: '4x25 je Lage mit Fokus auf Übergänge.', defaultDistance: 100, tags: [], equipment: [] },
+    { name: 'Bilaterales Atmen', category: 'atmung', stroke: 'Freistil', description: 'Kraul mit Atmung alle 3 Züge zur Symmetrieschulung.', defaultDistance: 200, tags: ['technik'], equipment: ['schnorchel'] },
+    { name: 'Trockenkraft Rumpf', category: 'kraft', stroke: null, description: 'Zirkel: Plank, Superman, Seitstütz, je 3 Runden.', defaultDistance: null, tags: ['land'], equipment: ['medizinball'] },
   ].map(e => ({ id: id(), ...e }));
   await bulkPut('exercises', exercises);
 
