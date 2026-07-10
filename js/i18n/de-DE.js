@@ -19,7 +19,7 @@ export default {
     dashboard: 'Dashboard', athletes: 'Athleten & Team', competitions: 'Wettkämpfe',
     times: 'Zeiten & Leistung', plans: 'Trainingspläne', templates: 'Vorlagen',
     catalog: 'Übungskatalog', sessions: 'Einheiten & Feedback', actionitems: 'Handlungsfelder',
-    stats: 'Statistiken', syncqueue: 'Sync-Warteschlange',
+    stats: 'Statistiken', syncqueue: 'Sync-Warteschlange', profile: 'Mein Profil',
   },
   settings: {
     title: 'Einstellungen', accounts: 'Konten', roleLabel: 'Rolle',
@@ -237,6 +237,17 @@ export default {
     nothingToSync: 'Nichts zu synchronisieren', syncing: 'Synchronisiere {count} Event(s) …',
     simulatedError: 'Simulierter Netzwerkfehler — Backend nicht erreichbar.',
     syncDoneOk: 'Sync erfolgreich abgeschlossen', syncDoneFailed: 'Sync abgeschlossen, {count} Event(s) fehlgeschlagen',
+  },
+  profile: {
+    eyebrow: 'Mein Konto', title: 'Mein Profil',
+    formName: 'Name', formEmail: 'E-Mail-Adresse',
+    roleLabel: 'Rolle', accountSection: 'Kontodaten',
+    linkedAthlete: 'Verknüpftes Athletenprofil', noLinkedAthlete: 'Kein Athletenprofil verknüpft.',
+    linkedAthleteNote: 'Stammdaten des Athletenprofils (Geburtsdatum, Gruppe, Notizen …) werden von Trainer:innen im Bereich „Athleten & Team" gepflegt.',
+    languageSectionTitle: 'Sprache', languageSectionHint: 'Wirkt sofort auf die gesamte Oberfläche und wird für dieses Konto gespeichert.',
+    validationName: 'Bitte einen Namen angeben.',
+    validationEmail: 'Bitte eine gültige E-Mail-Adresse angeben.',
+    saved: 'Profil aktualisiert',
   },
   setEditor: {
     colDistance: 'Dist. (m)', colDescription: 'Beschreibung', colReps: 'Wdh.', colRest: 'Pause (s)',
