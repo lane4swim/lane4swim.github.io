@@ -118,43 +118,51 @@ function buildSetRow(s, exercises, onRemove, onEquipmentChange) {
     el('input', { type: 'number', min: '0', value: s.restSec ?? 0, oninput: (e) => s.restSec = parseInt(e.target.value) || 0 }),
     el('button', { type: 'button', class: 'btn btn-danger btn-sm', title: t('setEditor.removeRow'), onclick: onRemove }, '×'),
   ]);
+
+  // Everything below the main 5 columns (intensity, catalog hint, equipment)
+  // lives in one dedicated full-width wrapper that explicitly spans the
+  // entire grid row (`.set-row-extra`, grid-column: 1 / -1) and stacks its
+  // children with flexbox. This avoids relying on the CSS Grid's implicit
+  // auto-placement for several separately positioned elements, which is
+  // harder to reason about and easy to get subtly wrong.
+  const extra = el('div', { class: 'set-row-extra' });
+
   const intensitySel = selectInput(trOptions(SET_INTENSITIES, 'setIntensities'), s.intensity || 'ga1', {
     onchange: (e) => s.intensity = e.target.value,
-    style: 'grid-column:2/3;margin-top:4px',
   });
-  row.appendChild(intensitySel);
+  extra.appendChild(intensitySel);
 
   if (s.exerciseId) {
     const ex = exercises.find(x => x.id === s.exerciseId);
     if (ex) {
-      row.appendChild(el('span', { class: 'hint', style: 'grid-column:2/3' }, t('setEditor.fromCatalogHint', { name: ex.name })));
+      extra.appendChild(el('span', { class: 'hint' }, t('setEditor.fromCatalogHint', { name: ex.name })));
 
       // Read-only equipment badges + an inline, persistent editor toggle.
       // Equipment lives on the *exercise* (catalog entry), not the set —
       // editing it here updates the same 'exercises' record used by the
       // Übungskatalog module, it's just a faster path while building a
       // plan/template so you don't have to leave the editor.
-      const eqDisplay = el('div', { style: 'grid-column:2/3' });
-      row.appendChild(eqDisplay);
-      const eqEditorHost = el('div', { style: 'grid-column:2/3;margin-top:4px' });
-      row.appendChild(eqEditorHost);
+      const eqDisplay = el('div');
+      const eqEditorHost = el('div');
+      extra.appendChild(eqDisplay);
+      extra.appendChild(eqEditorHost);
       let editorOpen = false;
 
       function drawDisplay() {
         clear(eqDisplay);
         const badges = (ex.equipment || []).map(eq => badge(trLabel(EQUIPMENT_ITEMS, eq, 'equipment'), 'pb'));
         const editBtn = el('button', {
-          type: 'button', class: 'btn btn-ghost btn-sm', style: 'margin-top:2px',
+          type: 'button', class: 'btn btn-ghost btn-sm',
           onclick: () => { editorOpen = !editorOpen; drawEditor(); },
         }, editorOpen ? t('common.close') : t('setEditor.editEquipment'));
-        eqDisplay.appendChild(el('div', { class: 'pill-group', style: 'margin-top:2px' }, [...badges, editBtn]));
+        eqDisplay.appendChild(el('div', { class: 'pill-group', style: 'margin-top:4px' }, [...badges, editBtn]));
       }
 
       function drawEditor() {
         clear(eqEditorHost);
         if (!editorOpen) { drawDisplay(); return; }
         const selected = new Set(ex.equipment || []);
-        const pills = el('div', { class: 'pill-group' });
+        const pills = el('div', { class: 'pill-group', style: 'margin-top:4px' });
         EQUIPMENT_ITEMS.forEach(eq => {
           const pill = el('button', {
             type: 'button', class: `pill ${selected.has(eq.value) ? 'active' : ''}`,
@@ -163,6 +171,7 @@ function buildSetRow(s, exercises, onRemove, onEquipmentChange) {
               pill.classList.toggle('active');
               ex.equipment = [...selected];
               await put('exercises', { ...ex });
+              toast(t('setEditor.equipmentSaved'));
               drawDisplay();
               onEquipmentChange?.();
             },
@@ -175,6 +184,8 @@ function buildSetRow(s, exercises, onRemove, onEquipmentChange) {
       drawDisplay();
     }
   }
+
+  row.appendChild(extra);
   return row;
 }
 
