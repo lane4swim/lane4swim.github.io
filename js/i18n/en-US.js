@@ -171,6 +171,8 @@ export default {
     formName: 'Name', formCategory: 'Category', formStroke: 'Stroke', noStroke: '— stroke-independent —',
     formDistance: 'Default distance (m)', formDistancePlaceholder: 'e.g. 100',
     formTags: 'Tags', formTagsHint: 'comma-separated', formDescription: 'Description',
+    formEquipment: 'Required equipment', formEquipmentHint: 'multiple selection possible',
+    noEquipment: 'No equipment needed',
     validationName: 'Please enter a name.', savedEdit: 'Changes saved', savedCreate: 'Exercise added',
   },
   sessions: {
@@ -259,6 +261,7 @@ export default {
     removeBlock: 'Remove block', blockNamePlaceholder: 'Block name, e.g. "Main set"',
     fromCatalogHint: 'from exercise catalog: {name}', noSetsInBlock: 'No sets in this block yet.',
     blockSummary: 'Block distance: {inner} m per round × {n} = {total} m total',
+    equipmentSummary: 'Equipment needed:', equipmentNone: 'No equipment needed',
   },
   refdata: {
     courses: { LCM: 'LCM · 50m pool', SCM: 'SCM · 25m pool' },
@@ -274,6 +277,11 @@ export default {
       verhalten: 'Behavior / Attitude', verletzung: 'Health / Load', sonstiges: 'Other',
     },
     actionStatus: { offen: 'Open', progress: 'In progress', done: 'Done' },
+    equipment: {
+      brett: 'Kickboard', pullbuoy: 'Pull buoy', flossen: 'Fins', kurzflossen: 'Short fins',
+      paddles: 'Paddles', schnorchel: 'Snorkel', zugband: 'Stretch cord',
+      bremswiderstand: 'Drag resistance (parachute/bucket)', medizinball: 'Medicine ball', startblock: 'Starting block',
+    },
     events: {
       '50 Freistil': '50 Freestyle', '100 Freistil': '100 Freestyle', '200 Freistil': '200 Freestyle',
       '400 Freistil': '400 Freestyle', '800 Freistil': '800 Freestyle', '1500 Freistil': '1500 Freestyle',
