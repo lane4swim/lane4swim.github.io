@@ -10,14 +10,17 @@ import {
 import { getRole } from '../state.js';
 import { navigate } from '../router.js';
 import { t, trCode } from '../i18n.js';
+import { beginRender } from '../utils.js';
 
 export const athletesModule = {
   id: 'athletes',
   roles: ['trainer', 'admin'],
   icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="8" r="2.6" opacity=".6"/><path d="M15.5 14.3c2.6.4 4.5 2.7 4.5 5.7" opacity=".6"/></svg>`,
   async render(container, params) {
+    const isCurrent = beginRender(container);
     clear(container);
     const [athletes, groups] = await Promise.all([getAll('athletes'), getAll('groups')]);
+    if (!isCurrent()) return;
     if (params[0]) return renderDetail(container, params[0], athletes, groups);
     renderList(container, athletes, groups);
   }
