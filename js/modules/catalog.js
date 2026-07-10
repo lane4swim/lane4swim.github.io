@@ -3,7 +3,7 @@
 // ============================================================
 import { getAll, put, remove } from '../db.js';
 import { el, clear, field, textInput, selectInput, openModal, confirmAction, toast, badge, emptyState, laneWave, beginRender } from '../utils.js';
-import { EXERCISE_CATEGORIES, STROKES } from '../refdata.js';
+import { EXERCISE_CATEGORIES, STROKES, EQUIPMENT_ITEMS } from '../refdata.js';
 import { getRole } from '../state.js';
 import { t, trLabel, trCode, trOptions } from '../i18n.js';
 
@@ -53,6 +53,7 @@ function renderList(container, exercises) {
         el('div', { class: 'pill-group mb-8' }, [
           ex.stroke ? badge(trCode(ex.stroke, 'strokes'), 'progress') : null,
           ex.defaultDistance ? badge(`${ex.defaultDistance} m`, 'neutral') : null,
+          ...(ex.equipment || []).map(eq => badge(trLabel(EQUIPMENT_ITEMS, eq, 'equipment'), 'pb')),
           ...(ex.tags || []).map(tag => badge(tag, 'neutral')),
         ].filter(Boolean)),
         el('div', { class: 'flex gap-8', style: 'margin-top:10px' }, [
@@ -70,7 +71,7 @@ function renderList(container, exercises) {
 
 function openExerciseModal(exercise, onSaved) {
   const isEdit = !!exercise;
-  const data = exercise ? { ...exercise } : { name: '', category: 'technik', stroke: '', description: '', defaultDistance: '', tags: [] };
+  const data = exercise ? { ...exercise } : { name: '', category: 'technik', stroke: '', description: '', defaultDistance: '', tags: [], equipment: [] };
   const form = el('form', { class: 'form-grid' });
   const fName = textInput(data.name, { required: true });
   const fCat = selectInput(trOptions(EXERCISE_CATEGORIES, 'exerciseCategories'), data.category);
@@ -82,6 +83,20 @@ function openExerciseModal(exercise, onSaved) {
   form.appendChild(field(t('catalog.formCategory'), fCat));
   form.appendChild(field(t('catalog.formStroke'), fStroke));
   form.appendChild(field(t('catalog.formDistance'), fDist));
+  const selectedEquipment = new Set(data.equipment || []);
+  const equipmentPills = el('div', { class: 'pill-group' });
+  EQUIPMENT_ITEMS.forEach(eq => {
+    const isActive = selectedEquipment.has(eq.value);
+    const pill = el('button', {
+      type: 'button', class: `pill ${isActive ? 'active' : ''}`,
+      onclick: () => {
+        if (selectedEquipment.has(eq.value)) selectedEquipment.delete(eq.value); else selectedEquipment.add(eq.value);
+        pill.classList.toggle('active');
+      },
+    }, trLabel(EQUIPMENT_ITEMS, eq.value, 'equipment'));
+    equipmentPills.appendChild(pill);
+  });
+  form.appendChild(field(t('catalog.formEquipment'), equipmentPills, { span2: true, hint: t('catalog.formEquipmentHint') }));
   form.appendChild(field(t('catalog.formTags'), fTags, { hint: t('catalog.formTagsHint') }));
   form.appendChild(field(t('catalog.formDescription'), fDesc, { span2: true }));
   form.appendChild(el('div', { class: 'form-actions', style: 'grid-column:1/-1' }, [
@@ -95,6 +110,7 @@ function openExerciseModal(exercise, onSaved) {
       ...data, name: fName.value.trim(), category: fCat.value, stroke: fStroke.value || null,
       defaultDistance: fDist.value ? parseInt(fDist.value) : null, description: fDesc.value.trim(),
       tags: fTags.value.split(',').map(x => x.trim()).filter(Boolean),
+      equipment: [...selectedEquipment],
     });
     toast(isEdit ? t('catalog.savedEdit') : t('catalog.savedCreate'));
     close(); onSaved?.();
