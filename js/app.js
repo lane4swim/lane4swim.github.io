@@ -3,9 +3,10 @@
 // ============================================================
 import { getAll, pendingSyncCount } from './db.js';
 import { seedIfEmpty, resetDemoData } from './seed.js';
-import { initSession, getCurrentUser, setCurrentUserById, getRole, onUserChange } from './state.js';
+import { initSession, getCurrentUser, setCurrentUserById, setUserLocale, getRole, onUserChange } from './state.js';
 import { registerModule, visibleModules, currentRoute, navigate, onRouteChange, getModule } from './router.js';
 import { el, clear, toast, confirmAction, openModal, field, textInput, selectInput } from './utils.js';
+import { t, getLocale, getAvailableLocales, onLocaleChange } from './i18n.js';
 
 import { dashboardModule } from './modules/dashboard.js';
 import { athletesModule } from './modules/athletes.js';
@@ -28,37 +29,54 @@ const navList = document.getElementById('nav-list');
 const bottomNav = document.getElementById('bottomnav');
 const userSelect = document.getElementById('user-select');
 const netIndicator = document.getElementById('net-indicator');
+const languageSelect = document.getElementById('language-select');
 
 async function boot() {
   registerServiceWorker();
   await seedIfEmpty();
-  await initSession();
+  await initSession(); // also sets the initial locale from the current user
   await populateUserSelect();
+  populateLanguageSelect();
   buildNav();
   updateNetStatus();
   window.addEventListener('online', updateNetStatus);
   window.addEventListener('offline', updateNetStatus);
   onRouteChange(render);
-  onUserChange(() => { buildNav(); render(currentRoute()); });
+  onUserChange(() => { populateUserSelect(); populateLanguageSelect(); buildNav(); render(currentRoute()); });
+  onLocaleChange(() => { populateLanguageSelect(); buildNav(); updateNetStatus(); render(currentRoute()); });
   render(currentRoute());
 }
 
 function updateNetStatus() {
   const online = navigator.onLine;
   netIndicator.classList.toggle('net-offline', !online);
-  netIndicator.querySelector('.net-label').textContent = online ? 'Offline bereit' : 'Offline-Modus aktiv';
+  netIndicator.querySelector('.net-label').textContent = online ? t('topbar.offlineReady') : t('topbar.offlineMode');
 }
 
 async function populateUserSelect() {
   const users = await getAll('users');
   clear(userSelect);
   users.forEach(u => {
-    const roleLabel = u.role === 'trainer' ? 'Trainer:in' : u.role === 'admin' ? 'Admin' : 'Athlet:in';
+    const roleLabel = t(`settings.role_${u.role}`);
     userSelect.appendChild(el('option', { value: u.id }, `${u.name} (${roleLabel})`));
   });
   const current = getCurrentUser();
   if (current) userSelect.value = current.id;
   userSelect.onchange = async () => { await setCurrentUserById(userSelect.value); navigate('dashboard'); };
+}
+
+// Language switcher: lives in the topbar so it's reachable from
+// anywhere, one click away, regardless of which module is open —
+// changing it updates the *current user's* stored preference (see
+// state.js: setUserLocale) so it's remembered per account.
+function populateLanguageSelect() {
+  clear(languageSelect);
+  getAvailableLocales().forEach(loc => {
+    languageSelect.appendChild(el('option', { value: loc.code }, `${loc.flag} ${loc.label}`));
+  });
+  languageSelect.value = getLocale();
+  languageSelect.title = t('topbar.language');
+  languageSelect.onchange = async () => { await setUserLocale(languageSelect.value); };
 }
 
 function buildNav() {
@@ -67,14 +85,15 @@ function buildNav() {
   clear(navList);
   clear(bottomNav);
   mods.forEach(m => {
+    const label = t(`nav.${m.id}`);
     const navBadge = m.id === 'syncqueue' ? el('span', { class: 'nav-badge', hidden: true }) : null;
     const li = el('li', {}, el('button', { class: 'nav-link', 'data-route': m.id, onclick: () => navigate(m.id) }, [
-      el('span', { class: 'ic', html: m.icon }), el('span', { style: 'flex:1' }, m.label), navBadge,
+      el('span', { class: 'ic', html: m.icon }), el('span', { style: 'flex:1' }, label), navBadge,
     ].filter(Boolean)));
     navList.appendChild(li);
     const bottomBadge = m.id === 'syncqueue' ? el('span', { class: 'nav-badge nav-badge-mobile', hidden: true }) : null;
     const bBtn = el('button', { 'data-route': m.id, onclick: () => navigate(m.id), style: 'position:relative' }, [
-      el('span', { class: 'ic', html: m.icon }), el('span', {}, m.label.split(' ')[0]), bottomBadge,
+      el('span', { class: 'ic', html: m.icon }), el('span', {}, label.split(' ')[0]), bottomBadge,
     ].filter(Boolean));
     bottomNav.appendChild(bBtn);
   });
@@ -99,14 +118,14 @@ async function render(route) {
   let mod = getModule(route.routeId);
   if (!mod || (mod.roles && !mod.roles.includes(role))) mod = visibleModules(role)[0];
   markActive(mod.id);
-  viewEl.innerHTML = '<div class="empty-state">Lädt…</div>';
+  viewEl.innerHTML = `<div class="empty-state">${t('common.loading')}</div>`;
   try {
     await mod.render(viewEl, route.params || []);
   } catch (err) {
     console.error(err);
     viewEl.innerHTML = '';
     viewEl.appendChild(el('div', { class: 'empty-state' }, [
-      el('h3', {}, 'Etwas ist schiefgelaufen'),
+      el('h3', {}, t('common.somethingWentWrong')),
       el('p', {}, String(err?.message || err)),
     ]));
   }
@@ -118,16 +137,17 @@ async function render(route) {
 document.getElementById('btn-settings').addEventListener('click', openSettings);
 
 async function openSettings() {
+  document.getElementById('btn-settings').textContent = t('topbar.settings');
   const users = await getAll('users');
   const body = el('div');
-  body.appendChild(el('h3', { class: 'mt-0' }, 'Konten'));
-  users.forEach(u => body.appendChild(el('p', { class: 'text-sm' }, `${u.name} — Rolle: ${u.role}`)));
-  body.appendChild(el('p', { class: 'hint' }, 'Diese App speichert alle Daten ausschließlich lokal auf diesem Gerät (IndexedDB) und funktioniert vollständig offline.'));
+  body.appendChild(el('h3', { class: 'mt-0' }, t('settings.accounts')));
+  users.forEach(u => body.appendChild(el('p', { class: 'text-sm' }, `${u.name} — ${t('settings.roleLabel')}: ${t(`settings.role_${u.role}`)}`)));
+  body.appendChild(el('p', { class: 'hint' }, t('settings.storageNote')));
   body.appendChild(el('div', { class: 'form-actions', style: 'justify-content:flex-start;margin-top:20px' }, [
-    el('button', { class: 'btn btn-ghost', onclick: exportData }, 'Daten exportieren (JSON)'),
-    el('button', { class: 'btn btn-danger', onclick: () => confirmAction('Alle Daten zurücksetzen und Demo-Daten neu laden? Dies kann nicht widerrufen werden.', async () => { await resetDemoData(); toast('Demo-Daten neu geladen'); location.reload(); }, { title: 'Zurücksetzen', confirmLabel: 'Zurücksetzen' }) }, 'Auf Demo-Daten zurücksetzen'),
+    el('button', { class: 'btn btn-ghost', onclick: exportData }, t('settings.exportButton')),
+    el('button', { class: 'btn btn-danger', onclick: () => confirmAction(t('settings.resetConfirm'), async () => { await resetDemoData(); toast(t('settings.resetDone')); location.reload(); }, { title: t('settings.resetConfirmLabel'), confirmLabel: t('settings.resetConfirmLabel') }) }, t('settings.resetButton')),
   ]));
-  openModal({ title: 'Einstellungen', bodyNode: body, wide: true });
+  openModal({ title: t('settings.title'), bodyNode: body, wide: true });
 }
 
 async function exportData() {
@@ -138,7 +158,7 @@ async function exportData() {
   a.href = URL.createObjectURL(blob);
   a.download = `lane1-export-${new Date().toISOString().slice(0, 10)}.json`;
   a.click();
-  toast('Export gestartet');
+  toast(t('settings.exportStarted'));
 }
 
 function registerServiceWorker() {
