@@ -3,8 +3,9 @@
 // ============================================================
 import { getAll, put, remove, uid } from '../db.js';
 import { el, clear, field, textInput, openModal, confirmAction, toast, badge, emptyState, laneWave, beginRender } from '../utils.js';
-import { renderSetEditor, totalDistance, cloneItems } from './setEditor.js';
-import { t } from '../i18n.js';
+import { renderSetEditor, totalDistance, cloneItems, collectEquipment } from './setEditor.js';
+import { EQUIPMENT_ITEMS } from '../refdata.js';
+import { t, trLabel } from '../i18n.js';
 
 export const templatesModule = {
   id: 'templates',
@@ -34,11 +35,15 @@ function renderList(container, templates, exercises) {
 
   if (templates.length === 0) { host.appendChild(emptyState(t('templates.noTemplatesTitle'), t('templates.noTemplatesMsg'), null)); }
   templates.forEach(tpl => {
+    const tplEquipment = collectEquipment(tpl.sets || [], exercises);
     const card = el('div', { class: 'card' }, [
       el('div', { class: 'flex justify-between items-center' }, [el('h3', { class: 'mt-0' }, tpl.name), badge(t('plans.totalBadge', { m: totalDistance(tpl.sets || []) }), 'neutral')]),
       el('p', { class: 'text-sm' }, tpl.description || ''),
       el('div', { class: 'pill-group mb-8' }, (tpl.tags || []).map(tag => badge(tag, 'neutral'))),
     ]);
+    if (tplEquipment.length > 0) {
+      card.appendChild(el('p', { class: 'text-sm' }, `${t('setEditor.equipmentSummary')} ${tplEquipment.map(eq => trLabel(EQUIPMENT_ITEMS, eq, 'equipment')).join(', ')}`));
+    }
     const list = el('div', { class: 'mb-8' });
     (tpl.sets || []).forEach(entry => {
       if (entry.kind === 'block') {
@@ -47,8 +52,15 @@ function renderList(container, templates, exercises) {
           el('span', { class: 'data text-sm' }, `${totalDistance(entry.sets || []) * (entry.repeatCount || 1)}m`),
         ]));
       } else {
+        const ex = entry.exerciseId ? exercises.find(x => x.id === entry.exerciseId) : null;
         list.appendChild(el('div', { class: 'list-row' }, [
-          el('span', { style: 'flex:1' }, entry.description || '—'), el('span', { class: 'data text-sm' }, `${entry.reps}× ${entry.distance ?? '—'}m`),
+          el('span', { style: 'flex:1' }, [
+            entry.description || '—',
+            ex && (ex.equipment || []).length > 0
+              ? el('div', { class: 'pill-group', style: 'margin-top:3px' }, ex.equipment.map(eq => badge(trLabel(EQUIPMENT_ITEMS, eq, 'equipment'), 'pb')))
+              : null,
+          ].filter(Boolean)),
+          el('span', { class: 'data text-sm' }, `${entry.reps}× ${entry.distance ?? '—'}m`),
         ]));
       }
     });
