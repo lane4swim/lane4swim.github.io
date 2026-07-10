@@ -2,7 +2,7 @@
 // modules/dashboard.js
 // ============================================================
 import { getAll } from '../db.js';
-import { el, clear, fmtDateLong, todayISO, fullName, statCard, badge, laneWave, groupBy, average, secToTime } from '../utils.js';
+import { el, clear, fmtDateLong, todayISO, fullName, statCard, badge, laneWave, groupBy, average, secToTime, beginRender } from '../utils.js';
 import { getRole, getCurrentUser } from '../state.js';
 import { navigate } from '../router.js';
 import { totalDistance } from './setEditor.js';
@@ -12,17 +12,19 @@ export const dashboardModule = {
   id: 'dashboard',
   icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="5" rx="1.5"/><rect x="13" y="11" width="8" height="10" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/></svg>`,
   async render(container) {
+    const isCurrent = beginRender(container);
     clear(container);
     const role = getRole();
-    if (role === 'athlete') return renderAthleteDashboard(container);
-    return renderTrainerDashboard(container);
+    if (role === 'athlete') return renderAthleteDashboard(container, isCurrent);
+    return renderTrainerDashboard(container, isCurrent);
   }
 };
 
-async function renderTrainerDashboard(container) {
+async function renderTrainerDashboard(container, isCurrent) {
   const [athletes, groups, plans, sessions, actionItems, competitions] = await Promise.all(
     ['athletes', 'groups', 'plans', 'sessions', 'actionItems', 'competitions'].map(getAll)
   );
+  if (!isCurrent()) return;
 
   const today = todayISO();
   const upcomingComps = competitions.filter(c => c.date >= today).sort((a, b) => a.date.localeCompare(b.date));
@@ -125,11 +127,12 @@ async function renderTrainerDashboard(container) {
   container.appendChild(wrap);
 }
 
-async function renderAthleteDashboard(container) {
+async function renderAthleteDashboard(container, isCurrent) {
   const user = getCurrentUser();
   const [athletes, results, plans, actionItems, competitions] = await Promise.all(
     ['athletes', 'results', 'plans', 'actionItems', 'competitions'].map(getAll)
   );
+  if (!isCurrent()) return;
   const me = athletes.find(a => a.id === user?.athleteId);
   const wrap = el('div');
   wrap.appendChild(el('div', { class: 'page-head' }, [
