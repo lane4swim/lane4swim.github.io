@@ -5,10 +5,10 @@ import { getAll, put, remove } from '../db.js';
 import { el, clear, field, textInput, selectInput, openModal, confirmAction, toast, badge, emptyState, laneWave } from '../utils.js';
 import { EXERCISE_CATEGORIES, STROKES } from '../refdata.js';
 import { getRole } from '../state.js';
+import { t, trLabel, trCode, trOptions } from '../i18n.js';
 
 export const catalogModule = {
   id: 'catalog',
-  label: 'Übungskatalog',
   roles: ['trainer', 'admin'],
   icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/><path d="M9 7h7M9 11h7"/></svg>`,
   async render(container) {
@@ -21,15 +21,15 @@ export const catalogModule = {
 function renderList(container, exercises) {
   const wrap = el('div');
   wrap.appendChild(el('div', { class: 'page-head' }, [
-    el('div', {}, [el('div', { class: 'page-eyebrow' }, `${exercises.length} Übungen`), el('h1', { class: 'mt-0' }, 'Übungskatalog')]),
-    el('div', { class: 'page-actions' }, [el('button', { class: 'btn btn-primary', onclick: () => openExerciseModal(null, refresh) }, '+ Übung anlegen')]),
+    el('div', {}, [el('div', { class: 'page-eyebrow' }, t('catalog.eyebrow', { count: exercises.length })), el('h1', { class: 'mt-0' }, t('catalog.title'))]),
+    el('div', { class: 'page-actions' }, [el('button', { class: 'btn btn-primary', onclick: () => openExerciseModal(null, refresh) }, t('catalog.createExercise'))]),
   ]));
   wrap.appendChild(laneWave());
 
   let catFilter = 'all', search = '';
   const controls = el('div', { class: 'grid grid-2 mb-16' }, [
-    field('Suche', textInput('', { placeholder: 'Name oder Beschreibung…', oninput: (e) => { search = e.target.value.toLowerCase(); draw(); } })),
-    field('Kategorie', selectInput([{ value: 'all', label: 'Alle Kategorien' }, ...EXERCISE_CATEGORIES], 'all', { onchange: (e) => { catFilter = e.target.value; draw(); } })),
+    field(t('catalog.searchLabel'), textInput('', { placeholder: t('catalog.searchPlaceholder'), oninput: (e) => { search = e.target.value.toLowerCase(); draw(); } })),
+    field(t('catalog.categoryLabel'), selectInput([{ value: 'all', label: t('catalog.allCategories') }, ...trOptions(EXERCISE_CATEGORIES, 'exerciseCategories')], 'all', { onchange: (e) => { catFilter = e.target.value; draw(); } })),
   ]);
   wrap.appendChild(controls);
 
@@ -42,20 +42,20 @@ function renderList(container, exercises) {
     let filtered = exercises;
     if (catFilter !== 'all') filtered = filtered.filter(e => e.category === catFilter);
     if (search) filtered = filtered.filter(e => (e.name + ' ' + (e.description || '')).toLowerCase().includes(search));
-    if (filtered.length === 0) { host.appendChild(emptyState('Keine Übungen', 'Für diese Filter wurden keine Übungen gefunden.', null)); return; }
+    if (filtered.length === 0) { host.appendChild(emptyState(t('catalog.noExercisesTitle'), t('catalog.noExercisesMsg'), null)); return; }
     filtered.forEach(ex => {
-      const catLabel = EXERCISE_CATEGORIES.find(c => c.value === ex.category)?.label || ex.category;
+      const catLabel = trLabel(EXERCISE_CATEGORIES, ex.category, 'exerciseCategories');
       const card = el('div', { class: 'card' }, [
         el('div', { class: 'flex justify-between items-center mb-8' }, [el('h3', { class: 'mt-0', style: 'font-size:1.05rem' }, ex.name), badge(catLabel, 'neutral')]),
-        el('p', { class: 'text-sm' }, ex.description || 'Keine Beschreibung.'),
+        el('p', { class: 'text-sm' }, ex.description || t('catalog.noDescription')),
         el('div', { class: 'pill-group mb-8' }, [
-          ex.stroke ? badge(ex.stroke, 'progress') : null,
+          ex.stroke ? badge(trCode(ex.stroke, 'strokes'), 'progress') : null,
           ex.defaultDistance ? badge(`${ex.defaultDistance} m`, 'neutral') : null,
-          ...(ex.tags || []).map(t => badge(t, 'neutral')),
+          ...(ex.tags || []).map(tag => badge(tag, 'neutral')),
         ].filter(Boolean)),
         el('div', { class: 'flex gap-8', style: 'margin-top:10px' }, [
-          el('button', { class: 'btn btn-ghost btn-sm', onclick: () => openExerciseModal(ex, refresh) }, 'Bearbeiten'),
-          el('button', { class: 'btn btn-danger btn-sm', onclick: () => confirmAction(`"${ex.name}" aus dem Katalog löschen?`, async () => { await remove('exercises', ex.id); toast('Übung gelöscht'); refresh(); }) }, 'Löschen'),
+          el('button', { class: 'btn btn-ghost btn-sm', onclick: () => openExerciseModal(ex, refresh) }, t('common.edit')),
+          el('button', { class: 'btn btn-danger btn-sm', onclick: () => confirmAction(t('catalog.deleteConfirm', { name: ex.name }), async () => { await remove('exercises', ex.id); toast(t('catalog.deleted')); refresh(); }) }, t('common.delete')),
         ]),
       ]);
       host.appendChild(card);
@@ -71,31 +71,31 @@ function openExerciseModal(exercise, onSaved) {
   const data = exercise ? { ...exercise } : { name: '', category: 'technik', stroke: '', description: '', defaultDistance: '', tags: [] };
   const form = el('form', { class: 'form-grid' });
   const fName = textInput(data.name, { required: true });
-  const fCat = selectInput(EXERCISE_CATEGORIES, data.category);
-  const fStroke = selectInput([{ value: '', label: '— unabhängig —' }, ...STROKES.map(s => ({ value: s, label: s }))], data.stroke || '');
-  const fDist = el('input', { type: 'number', min: '0', value: data.defaultDistance || '', placeholder: 'z. B. 100' });
+  const fCat = selectInput(trOptions(EXERCISE_CATEGORIES, 'exerciseCategories'), data.category);
+  const fStroke = selectInput([{ value: '', label: t('catalog.noStroke') }, ...STROKES.map(s => ({ value: s, label: trCode(s, 'strokes') }))], data.stroke || '');
+  const fDist = el('input', { type: 'number', min: '0', value: data.defaultDistance || '', placeholder: t('catalog.formDistancePlaceholder') });
   const fDesc = el('textarea', {}, data.description || '');
-  const fTags = textInput((data.tags || []).join(', '), { placeholder: 'z. B. aufwärmen, technik' });
-  form.appendChild(field('Name', fName, { span2: true }));
-  form.appendChild(field('Kategorie', fCat));
-  form.appendChild(field('Schwimmlage', fStroke));
-  form.appendChild(field('Standarddistanz (m)', fDist));
-  form.appendChild(field('Tags', fTags, { hint: 'kommagetrennt' }));
-  form.appendChild(field('Beschreibung', fDesc, { span2: true }));
+  const fTags = textInput((data.tags || []).join(', '), { placeholder: 'e.g. warmup, technique' });
+  form.appendChild(field(t('catalog.formName'), fName, { span2: true }));
+  form.appendChild(field(t('catalog.formCategory'), fCat));
+  form.appendChild(field(t('catalog.formStroke'), fStroke));
+  form.appendChild(field(t('catalog.formDistance'), fDist));
+  form.appendChild(field(t('catalog.formTags'), fTags, { hint: t('catalog.formTagsHint') }));
+  form.appendChild(field(t('catalog.formDescription'), fDesc, { span2: true }));
   form.appendChild(el('div', { class: 'form-actions', style: 'grid-column:1/-1' }, [
-    el('button', { type: 'button', class: 'btn btn-ghost', onclick: () => close() }, 'Abbrechen'),
-    el('button', { type: 'submit', class: 'btn btn-primary' }, isEdit ? 'Speichern' : 'Anlegen'),
+    el('button', { type: 'button', class: 'btn btn-ghost', onclick: () => close() }, t('common.cancel')),
+    el('button', { type: 'submit', class: 'btn btn-primary' }, isEdit ? t('common.save') : t('common.create')),
   ]));
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    if (!fName.value.trim()) { toast('Bitte einen Namen angeben.', 'error'); return; }
+    if (!fName.value.trim()) { toast(t('catalog.validationName'), 'error'); return; }
     await put('exercises', {
       ...data, name: fName.value.trim(), category: fCat.value, stroke: fStroke.value || null,
       defaultDistance: fDist.value ? parseInt(fDist.value) : null, description: fDesc.value.trim(),
-      tags: fTags.value.split(',').map(t => t.trim()).filter(Boolean),
+      tags: fTags.value.split(',').map(x => x.trim()).filter(Boolean),
     });
-    toast(isEdit ? 'Änderungen gespeichert' : 'Übung angelegt');
+    toast(isEdit ? t('catalog.savedEdit') : t('catalog.savedCreate'));
     close(); onSaved?.();
   });
-  const { close } = openModal({ title: isEdit ? 'Übung bearbeiten' : 'Übung anlegen', bodyNode: form, wide: true });
+  const { close } = openModal({ title: isEdit ? t('catalog.modalEdit') : t('catalog.modalCreate'), bodyNode: form, wide: true });
 }
