@@ -6,13 +6,14 @@
 //   - a plain set:   { kind: 'set',   id, description, distance, reps, intensity, restSec, exerciseId? }
 //   - a repeat block:{ kind: 'block', id, label, repeatCount, sets: [ <plain set>, ... ] }
 //
-// Repeat blocks model classic swim-set notation like "3x [100 Freistil,
-// 50 Beine]" without forcing the whole block to be typed out longhand.
+// Repeat blocks model classic swim-set notation like "3x [100 free,
+// 50 kick]" without forcing the whole block to be typed out longhand.
 // Entries without a `kind` (older saved data) are treated as plain sets
 // for backward compatibility — no data migration needed.
 // ============================================================
 import { el, clear, uid, selectInput, badge } from '../utils.js';
 import { SET_INTENSITIES, EXERCISE_CATEGORIES } from '../refdata.js';
+import { t, trLabel, trOptions } from '../i18n.js';
 
 // Sensible defaults when a set is created from a catalog exercise,
 // since exercises don't carry pool-intensity/rest data themselves.
@@ -78,10 +79,10 @@ export function cloneItems(items) {
 }
 
 function buildExerciseOptions(exercises) {
-  return [{ value: '', label: '— Übung aus Katalog wählen —' }, ...exercises
+  return [{ value: '', label: t('setEditor.pickExercise') }, ...exercises
     .slice()
     .sort((a, b) => a.name.localeCompare(b.name))
-    .map(ex => ({ value: ex.id, label: `${EXERCISE_CATEGORIES.find(c => c.value === ex.category)?.label || ex.category} · ${ex.name}` }))];
+    .map(ex => ({ value: ex.id, label: `${trLabel(EXERCISE_CATEGORIES, ex.category, 'exerciseCategories')} · ${ex.name}` }))];
 }
 
 // Renders one plain-set row. `onRemove` is called when the row's × is clicked;
@@ -89,20 +90,19 @@ function buildExerciseOptions(exercises) {
 function buildSetRow(s, exercises, onRemove) {
   const row = el('div', { class: 'set-row' }, [
     el('input', { type: 'number', min: '0', value: s.distance ?? '', oninput: (e) => s.distance = e.target.value ? parseInt(e.target.value) : null }),
-    el('input', { type: 'text', value: s.description || '', placeholder: 'z. B. 8x100 Freistil', oninput: (e) => s.description = e.target.value }),
+    el('input', { type: 'text', value: s.description || '', placeholder: t('setEditor.descriptionPlaceholder'), oninput: (e) => s.description = e.target.value }),
     el('input', { type: 'number', min: '1', value: s.reps ?? 1, oninput: (e) => s.reps = parseInt(e.target.value) || 1 }),
     el('input', { type: 'number', min: '0', value: s.restSec ?? 0, oninput: (e) => s.restSec = parseInt(e.target.value) || 0 }),
-    el('button', { type: 'button', class: 'btn btn-danger btn-sm', title: 'Zeile entfernen', onclick: onRemove }, '×'),
+    el('button', { type: 'button', class: 'btn btn-danger btn-sm', title: t('setEditor.removeRow'), onclick: onRemove }, '×'),
   ]);
-  const intensitySel = selectInput(SET_INTENSITIES, s.intensity || 'ga1', {
+  const intensitySel = selectInput(trOptions(SET_INTENSITIES, 'setIntensities'), s.intensity || 'ga1', {
     onchange: (e) => s.intensity = e.target.value,
     style: 'grid-column:2/3;margin-top:4px',
-    title: 'Intensität',
   });
   row.appendChild(intensitySel);
   if (s.exerciseId) {
     const ex = exercises.find(x => x.id === s.exerciseId);
-    if (ex) row.appendChild(el('span', { class: 'hint', style: 'grid-column:2/3' }, `aus Übungskatalog: ${ex.name}`));
+    if (ex) row.appendChild(el('span', { class: 'hint', style: 'grid-column:2/3' }, t('setEditor.fromCatalogHint', { name: ex.name })));
   }
   return row;
 }
@@ -115,18 +115,18 @@ function buildBlockRow(block, exercises, onRemoveBlock, onRedrawParent) {
   const container = el('div', { class: 'day-block', style: 'margin:10px 0;border-style:dashed;border-color:var(--c-chlorine-d)' });
 
   const labelInput = el('input', {
-    type: 'text', value: block.label || '', placeholder: 'Blockname, z. B. „Hauptserie“',
+    type: 'text', value: block.label || '', placeholder: t('setEditor.blockNamePlaceholder'),
     style: 'min-width:180px', oninput: (e) => block.label = e.target.value,
   });
   const repeatInput = el('input', {
-    type: 'number', min: '1', value: block.repeatCount || 1, style: 'width:60px', title: 'Wie oft wird dieser Block wiederholt?',
+    type: 'number', min: '1', value: block.repeatCount || 1, style: 'width:60px',
     oninput: (e) => { block.repeatCount = Math.max(1, parseInt(e.target.value) || 1); updateSubtotal(); onRedrawParent(); },
   });
-  const removeBlockBtn = el('button', { type: 'button', class: 'btn btn-danger btn-sm', onclick: onRemoveBlock }, 'Block entfernen');
+  const removeBlockBtn = el('button', { type: 'button', class: 'btn btn-danger btn-sm', onclick: onRemoveBlock }, t('setEditor.removeBlock'));
 
   container.appendChild(el('div', { class: 'day-block-head' }, [
-    el('div', { class: 'flex items-center gap-8' }, [badge('Wiederholungsblock', 'progress'), labelInput]),
-    el('div', { class: 'flex items-center gap-8' }, [el('span', { class: 'text-sm' }, '× Wiederholungen:'), repeatInput, removeBlockBtn]),
+    el('div', { class: 'flex items-center gap-8' }, [badge(t('setEditor.repeatBlockBadge'), 'progress'), labelInput]),
+    el('div', { class: 'flex items-center gap-8' }, [el('span', { class: 'text-sm' }, t('setEditor.repeats')), repeatInput, removeBlockBtn]),
   ]));
 
   const innerHost = el('div');
@@ -136,7 +136,7 @@ function buildBlockRow(block, exercises, onRemoveBlock, onRedrawParent) {
 
   function updateSubtotal() {
     const inner = totalDistance(block.sets || []);
-    subtotalEl.textContent = `Blockdistanz: ${inner} m je Durchgang × ${block.repeatCount || 1} = ${inner * (block.repeatCount || 1)} m gesamt`;
+    subtotalEl.textContent = t('setEditor.blockSummary', { inner, n: block.repeatCount || 1, total: inner * (block.repeatCount || 1) });
   }
 
   function drawInner() {
@@ -145,20 +145,20 @@ function buildBlockRow(block, exercises, onRemoveBlock, onRedrawParent) {
       innerHost.appendChild(buildSetRow(s, exercises, () => { block.sets.splice(si, 1); drawInner(); updateSubtotal(); onRedrawParent(); }));
     });
     if (!block.sets || block.sets.length === 0) {
-      innerHost.appendChild(el('p', { class: 'hint', style: 'padding:4px 0' }, 'Noch keine Sätze in diesem Block.'));
+      innerHost.appendChild(el('p', { class: 'hint', style: 'padding:4px 0' }, t('setEditor.noSetsInBlock')));
     }
     updateSubtotal();
   }
   drawInner();
 
   const innerControls = el('div', { class: 'flex gap-8', style: 'margin-top:6px;flex-wrap:wrap' });
-  const addSetBtn = el('button', { type: 'button', class: 'btn btn-ghost btn-sm' }, '+ Satz im Block');
+  const addSetBtn = el('button', { type: 'button', class: 'btn btn-ghost btn-sm' }, t('setEditor.addSetInBlock'));
   addSetBtn.addEventListener('click', () => { block.sets = block.sets || []; block.sets.push(newBlankSet()); drawInner(); onRedrawParent(); });
   innerControls.appendChild(addSetBtn);
 
   if (exercises.length > 0) {
     const exerciseSel = selectInput(buildExerciseOptions(exercises), '', { style: 'min-width:220px' });
-    const useBtn = el('button', { type: 'button', class: 'btn btn-accent btn-sm' }, '+ aus Katalog (Block)');
+    const useBtn = el('button', { type: 'button', class: 'btn btn-accent btn-sm' }, t('setEditor.addFromCatalogBlock'));
     useBtn.addEventListener('click', () => {
       const ex = exercises.find(x => x.id === exerciseSel.value);
       if (!ex) return;
@@ -178,7 +178,7 @@ function buildBlockRow(block, exercises, onRemoveBlock, onRedrawParent) {
 
 // Renders an editable list of mixed sets/blocks into `hostNode`.
 // `items` is mutated in place; the caller reads the same array on submit.
-// `exercises` (optional) enables "aus Übungskatalog übernehmen" pickers.
+// `exercises` (optional) enables "use from exercise catalog" pickers.
 export function renderSetEditor(hostNode, items, exercises = []) {
   clear(hostNode);
 
@@ -186,14 +186,14 @@ export function renderSetEditor(hostNode, items, exercises = []) {
   hostNode.appendChild(totalEl);
 
   const head = el('div', { class: 'set-row set-row-head' }, [
-    el('span', {}, 'Dist. (m)'), el('span', {}, 'Beschreibung'), el('span', {}, 'Wdh.'), el('span', {}, 'Pause (s)'), el('span', {}, ''),
+    el('span', {}, t('setEditor.colDistance')), el('span', {}, t('setEditor.colDescription')), el('span', {}, t('setEditor.colReps')), el('span', {}, t('setEditor.colRest')), el('span', {}, ''),
   ]);
   hostNode.appendChild(head);
   const rowsHost = el('div');
   hostNode.appendChild(rowsHost);
 
   function updateTotal() {
-    totalEl.textContent = `Gesamtdistanz: ${totalDistance(items)} m`;
+    totalEl.textContent = t('setEditor.totalDistance', { m: totalDistance(items) });
   }
 
   function draw() {
@@ -206,7 +206,7 @@ export function renderSetEditor(hostNode, items, exercises = []) {
       }
     });
     if (items.length === 0) {
-      rowsHost.appendChild(el('p', { class: 'hint', style: 'padding:6px 0' }, 'Noch keine Sätze — leere Zeile, Übung aus dem Katalog oder Wiederholungsblock hinzufügen.'));
+      rowsHost.appendChild(el('p', { class: 'hint', style: 'padding:6px 0' }, t('setEditor.emptyHint')));
     }
     updateTotal();
   }
@@ -214,17 +214,17 @@ export function renderSetEditor(hostNode, items, exercises = []) {
 
   const controls = el('div', { class: 'flex gap-8', style: 'margin-top:10px;flex-wrap:wrap' });
 
-  const addBtn = el('button', { type: 'button', class: 'btn btn-ghost btn-sm' }, '+ leerer Satz');
+  const addBtn = el('button', { type: 'button', class: 'btn btn-ghost btn-sm' }, t('setEditor.addBlank'));
   addBtn.addEventListener('click', () => { items.push(newBlankSet()); draw(); });
   controls.appendChild(addBtn);
 
-  const addBlockBtn = el('button', { type: 'button', class: 'btn btn-primary btn-sm' }, '+ Wiederholungsblock');
+  const addBlockBtn = el('button', { type: 'button', class: 'btn btn-primary btn-sm' }, t('setEditor.addBlock'));
   addBlockBtn.addEventListener('click', () => { items.push(newBlock()); draw(); });
   controls.appendChild(addBlockBtn);
 
   if (exercises.length > 0) {
     const exerciseSel = selectInput(buildExerciseOptions(exercises), '', { style: 'min-width:260px' });
-    const useBtn = el('button', { type: 'button', class: 'btn btn-accent btn-sm' }, '+ aus Übungskatalog übernehmen');
+    const useBtn = el('button', { type: 'button', class: 'btn btn-accent btn-sm' }, t('setEditor.addFromCatalog'));
     useBtn.addEventListener('click', () => {
       const ex = exercises.find(x => x.id === exerciseSel.value);
       if (!ex) return;
