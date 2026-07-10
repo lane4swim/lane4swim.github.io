@@ -1,6 +1,7 @@
 // ============================================================
 // utils.js — shared helpers used across all modules
 // ============================================================
+import { t, getLocale } from './i18n.js';
 
 export function uid(prefix = 'id') {
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
@@ -38,12 +39,12 @@ export function nowISO(){ return new Date().toISOString(); }
 export function fmtDateLong(iso) {
   if (!iso) return '—';
   const d = new Date(iso + 'T00:00:00');
-  return d.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
+  return d.toLocaleDateString(getLocale(), { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
 }
 export function fmtDateShort(iso) {
   if (!iso) return '—';
   const d = new Date(iso + 'T00:00:00');
-  return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' });
+  return d.toLocaleDateString(getLocale(), { day: '2-digit', month: '2-digit', year: '2-digit' });
 }
 export function isoAddDays(iso, n) {
   const d = new Date(iso + 'T00:00:00');
@@ -136,7 +137,7 @@ export function openModal({ title, bodyNode, wide }) {
   const box = el('div', { class: 'modal-box', style: wide ? 'max-width:820px' : '' }, [
     el('div', { class: 'modal-head' }, [
       el('h3', { class: 'mt-0' }, title),
-      el('button', { class: 'modal-close', 'aria-label': 'Schließen', onclick: () => close() }, '×'),
+      el('button', { class: 'modal-close', 'aria-label': t('common.close'), onclick: () => close() }, '×'),
     ]),
     bodyNode,
   ]);
@@ -158,11 +159,11 @@ export function confirmAction(message, onConfirm, opts = {}) {
   const body = el('div', {}, [
     el('p', {}, message),
     el('div', { class: 'form-actions' }, [
-      el('button', { class: 'btn btn-ghost', onclick: () => close() }, 'Abbrechen'),
-      el('button', { class: 'btn btn-danger', onclick: () => { close(); onConfirm(); } }, opts.confirmLabel || 'Löschen'),
+      el('button', { class: 'btn btn-ghost', onclick: () => close() }, t('common.cancel')),
+      el('button', { class: 'btn btn-danger', onclick: () => { close(); onConfirm(); } }, opts.confirmLabel || t('common.delete')),
     ]),
   ]);
-  const { close } = openModal({ title: opts.title || 'Bitte bestätigen', bodyNode: body });
+  const { close } = openModal({ title: opts.title || t('common.confirmTitle'), bodyNode: body });
 }
 
 // ---- Form field helpers ----
@@ -215,7 +216,7 @@ export function fullName(athlete){
 export function svgLineChart({ points, width = 560, height = 200, yFormat, color = 'var(--c-chlorine-d)', invertY = false }) {
   const pad = { l: 46, r: 14, t: 16, b: 26 };
   const w = width - pad.l - pad.r, hgt = height - pad.t - pad.b;
-  if (!points.length) return el('div', { class: 'empty-state' }, 'Keine Daten');
+  if (!points.length) return el('div', { class: 'empty-state' }, t('stats.noDataTitle'));
   const xs = points.map((_, i) => i);
   const ys = points.map(p => p.y);
   let yMin = Math.min(...ys), yMax = Math.max(...ys);
@@ -253,7 +254,7 @@ export function svgLineChart({ points, width = 560, height = 200, yFormat, color
 export function svgBarChart({ bars, width = 560, height = 200, color = 'var(--c-petrol)', yFormat }) {
   const pad = { l: 46, r: 14, t: 16, b: 34 };
   const w = width - pad.l - pad.r, hgt = height - pad.t - pad.b;
-  if (!bars.length) return el('div', { class: 'empty-state' }, 'Keine Daten');
+  if (!bars.length) return el('div', { class: 'empty-state' }, t('stats.noDataTitle'));
   const max = Math.max(1, ...bars.map(b => b.value));
   const bw = w / bars.length;
   const rects = bars.map((b, i) => {
