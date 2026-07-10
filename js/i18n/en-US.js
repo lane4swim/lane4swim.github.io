@@ -19,7 +19,7 @@ export default {
     dashboard: 'Dashboard', athletes: 'Athletes & Team', competitions: 'Competitions',
     times: 'Times & Performance', plans: 'Training Plans', templates: 'Templates',
     catalog: 'Exercise Catalog', sessions: 'Sessions & Feedback', actionitems: 'Focus Areas',
-    stats: 'Statistics', syncqueue: 'Sync Queue',
+    stats: 'Statistics', syncqueue: 'Sync Queue', profile: 'My Profile',
   },
   settings: {
     title: 'Settings', accounts: 'Accounts', roleLabel: 'Role',
@@ -237,6 +237,17 @@ export default {
     nothingToSync: 'Nothing to sync', syncing: 'Syncing {count} event(s) …',
     simulatedError: 'Simulated network error — backend unreachable.',
     syncDoneOk: 'Sync completed successfully', syncDoneFailed: 'Sync completed, {count} event(s) failed',
+  },
+  profile: {
+    eyebrow: 'My Account', title: 'My Profile',
+    formName: 'Name', formEmail: 'Email address',
+    roleLabel: 'Role', accountSection: 'Account details',
+    linkedAthlete: 'Linked athlete profile', noLinkedAthlete: 'No athlete profile linked.',
+    linkedAthleteNote: 'Athlete profile data (date of birth, group, notes, …) is maintained by coaches under "Athletes & Team".',
+    languageSectionTitle: 'Language', languageSectionHint: 'Applies immediately to the whole interface and is saved for this account.',
+    validationName: 'Please enter a name.',
+    validationEmail: 'Please enter a valid email address.',
+    saved: 'Profile updated',
   },
   setEditor: {
     colDistance: 'Dist. (m)', colDescription: 'Description', colReps: 'Reps', colRest: 'Rest (s)',
