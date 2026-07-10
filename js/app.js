@@ -5,7 +5,7 @@ import { getAll, pendingSyncCount } from './db.js';
 import { seedIfEmpty, resetDemoData } from './seed.js';
 import { initSession, getCurrentUser, setCurrentUserById, setUserLocale, getRole, onUserChange } from './state.js';
 import { registerModule, visibleModules, currentRoute, navigate, onRouteChange, getModule } from './router.js';
-import { el, clear, toast, confirmAction, openModal, field, textInput, selectInput } from './utils.js';
+import { el, clear, toast, confirmAction, openModal, field, textInput, selectInput, beginRender } from './utils.js';
 import { t, getLocale, getAvailableLocales, onLocaleChange } from './i18n.js';
 
 import { dashboardModule } from './modules/dashboard.js';
@@ -43,7 +43,7 @@ async function boot() {
   window.addEventListener('offline', updateNetStatus);
   onRouteChange(render);
   onUserChange(() => { populateUserSelect(); populateLanguageSelect(); buildNav(); render(currentRoute()); });
-  onLocaleChange(() => { populateLanguageSelect(); buildNav(); updateNetStatus(); render(currentRoute()); });
+  onLocaleChange(() => { populateUserSelect(); populateLanguageSelect(); buildNav(); updateNetStatus(); render(currentRoute()); });
   render(currentRoute());
 }
 
@@ -114,6 +114,7 @@ function markActive(routeId) {
 }
 
 async function render(route) {
+  const isCurrent = beginRender(viewEl);
   const role = getRole();
   let mod = getModule(route.routeId);
   if (!mod || (mod.roles && !mod.roles.includes(role))) mod = visibleModules(role)[0];
@@ -122,6 +123,7 @@ async function render(route) {
   try {
     await mod.render(viewEl, route.params || []);
   } catch (err) {
+    if (!isCurrent()) return; // a newer render superseded this one; don't show a stale error
     console.error(err);
     viewEl.innerHTML = '';
     viewEl.appendChild(el('div', { class: 'empty-state' }, [
@@ -129,6 +131,7 @@ async function render(route) {
       el('p', {}, String(err?.message || err)),
     ]));
   }
+  if (!isCurrent()) return; // a newer render started while this one was still loading data
   viewEl.focus();
   updateSyncBadge();
 }
