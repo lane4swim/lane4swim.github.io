@@ -2,7 +2,7 @@
 // modules/catalog.js — Übungskatalog
 // ============================================================
 import { getAll, put, remove } from '../db.js';
-import { el, clear, field, textInput, selectInput, openModal, confirmAction, toast, badge, emptyState, laneWave } from '../utils.js';
+import { el, clear, field, textInput, selectInput, openModal, confirmAction, toast, badge, emptyState, laneWave, beginRender } from '../utils.js';
 import { EXERCISE_CATEGORIES, STROKES } from '../refdata.js';
 import { getRole } from '../state.js';
 import { t, trLabel, trCode, trOptions } from '../i18n.js';
@@ -12,8 +12,10 @@ export const catalogModule = {
   roles: ['trainer', 'admin'],
   icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/><path d="M9 7h7M9 11h7"/></svg>`,
   async render(container) {
+    const isCurrent = beginRender(container);
     clear(container);
     const exercises = await getAll('exercises');
+    if (!isCurrent()) return;
     renderList(container, exercises);
   }
 };
