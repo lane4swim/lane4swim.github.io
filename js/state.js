@@ -43,11 +43,17 @@ export async function setCurrentUserById(id) {
 }
 
 // Changes and persists the *current* user's preferred display language.
+// Note: this intentionally does NOT call emit() (onUserChange) — only
+// setLocale() (onLocaleChange). Firing both previously caused two
+// separate listeners in app.js to each trigger a full re-render of the
+// current view, and since rendering is async, the two overlapping
+// render calls could interleave and duplicate the module's content.
+// app.js's onLocaleChange handler already refreshes everything that
+// depends on the active user (e.g. role labels in the account picker).
 export async function setUserLocale(locale) {
   if (!current) { setLocale(locale); return null; }
   current = await put('users', { ...current, locale });
   setLocale(locale);
-  emit();
   return current;
 }
 
