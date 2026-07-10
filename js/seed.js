@@ -35,9 +35,9 @@ async function seedDemoData() {
   ].map(a => ({ id: id(), ...a }));
   await bulkPut('athletes', athletes);
 
-  const trainerUser = { id: id(), name: 'Sabine Reuter', role: 'trainer', athleteId: null, email: 'sabine.reuter@example.org' };
-  const adminUser = { id: id(), name: 'Team-Administrator', role: 'admin', athleteId: null, email: 'admin@example.org' };
-  const athleteUser = { id: id(), name: athletes[0].firstName + ' ' + athletes[0].lastName, role: 'athlete', athleteId: athletes[0].id, email: 'mara.vogel@example.org' };
+  const trainerUser = { id: id(), name: 'Sabine Reuter', role: 'trainer', athleteId: null, email: 'sabine.reuter@example.org', locale: 'de-DE' };
+  const adminUser = { id: id(), name: 'Team-Administrator', role: 'admin', athleteId: null, email: 'admin@example.org', locale: 'de-DE' };
+  const athleteUser = { id: id(), name: athletes[0].firstName + ' ' + athletes[0].lastName, role: 'athlete', athleteId: athletes[0].id, email: 'mara.vogel@example.org', locale: 'en-US' };
   await bulkPut('users', [trainerUser, adminUser, athleteUser]);
 
   const comp1 = { id: id(), name: 'Bezirksmeisterschaften Kurzbahn', date: isoAddDays(todayISO(), 21), location: 'Hallenbad Nord', course: 'SCM', notes: 'Meldeschluss 10 Tage vorher' };
