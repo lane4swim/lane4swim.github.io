@@ -10,14 +10,17 @@ import { EVENTS, COURSES } from '../refdata.js';
 import { navigate } from '../router.js';
 import { getRole } from '../state.js';
 import { t, trCode, trOptions, trOptionsFlat } from '../i18n.js';
+import { beginRender } from '../utils.js';
 
 export const competitionsModule = {
   id: 'competitions',
   roles: ['trainer', 'admin'],
   icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M6 4h12v4a6 6 0 01-12 0V4z"/><path d="M6 5H3a4 4 0 004 4"/><path d="M18 5h3a4 4 0 01-4 4"/></svg>`,
   async render(container, params) {
+    const isCurrent = beginRender(container);
     clear(container);
     const [competitions, athletes] = await Promise.all([getAll('competitions'), getAll('athletes')]);
+    if (!isCurrent()) return;
     if (params[0]) return renderDetail(container, params[0]);
     renderList(container, competitions, athletes);
   }
