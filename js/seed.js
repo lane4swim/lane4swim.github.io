@@ -77,6 +77,8 @@ async function seedDemoData() {
     { name: 'Trockenkraft Rumpf', category: 'kraft', stroke: null, description: 'Zirkel: Plank, Superman, Seitstütz, je 3 Runden.', defaultDistance: null, tags: ['land'], equipment: ['medizinball'] },
   ].map(e => ({ id: id(), ...e }));
   await bulkPut('exercises', exercises);
+  const kickboardEx = exercises.find(e => e.name === 'Kraulbeine mit Brett');
+  const sprintEx = exercises.find(e => e.name === 'Sprints 25m all-out');
 
   const template1 = {
     id: id(), name: 'Grundlagenausdauer – Standardwoche', description: 'Klassische GA1/GA2-Einheit für die Basisperiode.',
@@ -84,7 +86,7 @@ async function seedDemoData() {
     sets: [
       { kind: 'set', id: id(), description: 'Einschwimmen gemischt', distance: 400, reps: 1, intensity: 'locker', restSec: 0 },
       { kind: 'set', id: id(), description: '8x100 Freistil', distance: 100, reps: 8, intensity: 'ga1', restSec: 20 },
-      { kind: 'set', id: id(), description: '4x50 Beine', distance: 50, reps: 4, intensity: 'locker', restSec: 15 },
+      { kind: 'set', id: id(), description: '4x50 Beine', distance: 50, reps: 4, intensity: 'locker', restSec: 15, exerciseId: kickboardEx.id },
       { kind: 'set', id: id(), description: 'Ausschwimmen', distance: 200, reps: 1, intensity: 'locker', restSec: 0 },
     ],
   };
@@ -96,7 +98,7 @@ async function seedDemoData() {
       {
         kind: 'block', id: id(), label: 'Hauptserie Sprint', repeatCount: 3,
         sets: [
-          { kind: 'set', id: id(), description: '2x25 Sprint ab Wende', distance: 25, reps: 2, intensity: 'sprint', restSec: 30 },
+          { kind: 'set', id: id(), description: '2x25 Sprint ab Wende', distance: 25, reps: 2, intensity: 'sprint', restSec: 30, exerciseId: sprintEx.id },
           { kind: 'set', id: id(), description: '50 locker ausschwimmen', distance: 50, reps: 1, intensity: 'locker', restSec: 20 },
         ],
       },
@@ -106,6 +108,10 @@ async function seedDemoData() {
   };
   await bulkPut('templates', [template1, template2]);
 
+  // cloneSets() deliberately preserves exerciseId when copying a set (only
+  // ids of the set/block wrapper itself are refreshed) — this mirrors
+  // cloneItems() in setEditor.js and keeps the catalog link (and therefore
+  // the equipment display) intact when a template is applied to a plan day.
   function cloneSets(sets) {
     return sets.map(s => s.kind === 'block'
       ? { ...s, id: id(), sets: (s.sets || []).map(x => ({ ...x, id: id() })) }
