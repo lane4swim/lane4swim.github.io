@@ -12,7 +12,7 @@
 // for backward compatibility — no data migration needed.
 // ============================================================
 import { el, clear, uid, selectInput, badge } from '../utils.js';
-import { SET_INTENSITIES, EXERCISE_CATEGORIES } from '../refdata.js';
+import { SET_INTENSITIES, EXERCISE_CATEGORIES, EQUIPMENT_ITEMS } from '../refdata.js';
 import { t, trLabel, trOptions } from '../i18n.js';
 
 // Sensible defaults when a set is created from a catalog exercise,
@@ -78,6 +78,26 @@ export function cloneItems(items) {
   });
 }
 
+// Collects the de-duplicated set of equipment codes needed across a
+// (possibly nested, block-containing) list of entries, by looking up
+// each set's linked catalog exercise (if any) and its `equipment` list.
+// Sets not created from a catalog exercise simply contribute nothing —
+// there's no equipment info to draw on for freely-typed sets.
+export function collectEquipment(items, exercises) {
+  const codes = new Set();
+  const walk = (list) => {
+    (list || []).forEach(entry => {
+      if (entry.kind === 'block') { walk(entry.sets || []); return; }
+      if (entry.exerciseId) {
+        const ex = exercises.find(x => x.id === entry.exerciseId);
+        (ex?.equipment || []).forEach(eq => codes.add(eq));
+      }
+    });
+  };
+  walk(items);
+  return [...codes];
+}
+
 function buildExerciseOptions(exercises) {
   return [{ value: '', label: t('setEditor.pickExercise') }, ...exercises
     .slice()
@@ -102,7 +122,14 @@ function buildSetRow(s, exercises, onRemove) {
   row.appendChild(intensitySel);
   if (s.exerciseId) {
     const ex = exercises.find(x => x.id === s.exerciseId);
-    if (ex) row.appendChild(el('span', { class: 'hint', style: 'grid-column:2/3' }, t('setEditor.fromCatalogHint', { name: ex.name })));
+    if (ex) {
+      row.appendChild(el('span', { class: 'hint', style: 'grid-column:2/3' }, t('setEditor.fromCatalogHint', { name: ex.name })));
+      if ((ex.equipment || []).length > 0) {
+        const eqRow = el('div', { class: 'pill-group', style: 'grid-column:2/3;margin-top:2px' },
+          ex.equipment.map(eq => badge(trLabel(EQUIPMENT_ITEMS, eq, 'equipment'), 'pb')));
+        row.appendChild(eqRow);
+      }
+    }
   }
   return row;
 }
@@ -182,8 +209,10 @@ function buildBlockRow(block, exercises, onRemoveBlock, onRedrawParent) {
 export function renderSetEditor(hostNode, items, exercises = []) {
   clear(hostNode);
 
-  const totalEl = el('div', { class: 'hint', style: 'margin-bottom:8px;font-weight:700' });
+  const totalEl = el('div', { class: 'hint', style: 'margin-bottom:4px;font-weight:700' });
   hostNode.appendChild(totalEl);
+  const equipmentEl = el('div', { class: 'hint', style: 'margin-bottom:8px' });
+  hostNode.appendChild(equipmentEl);
 
   const head = el('div', { class: 'set-row set-row-head' }, [
     el('span', {}, t('setEditor.colDistance')), el('span', {}, t('setEditor.colDescription')), el('span', {}, t('setEditor.colReps')), el('span', {}, t('setEditor.colRest')), el('span', {}, ''),
@@ -194,6 +223,10 @@ export function renderSetEditor(hostNode, items, exercises = []) {
 
   function updateTotal() {
     totalEl.textContent = t('setEditor.totalDistance', { m: totalDistance(items) });
+    const equipment = collectEquipment(items, exercises);
+    equipmentEl.textContent = equipment.length > 0
+      ? `${t('setEditor.equipmentSummary')} ${equipment.map(eq => trLabel(EQUIPMENT_ITEMS, eq, 'equipment')).join(', ')}`
+      : t('setEditor.equipmentNone');
   }
 
   function draw() {
