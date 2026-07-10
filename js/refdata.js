@@ -29,6 +29,22 @@ export const EXERCISE_CATEGORIES = [
   { value: 'koordination', label: 'Koordination' },
 ];
 
+// Common swim-training equipment. Exercises reference these by `value`
+// (stable code, independent of display language); `label` is only the
+// German fallback shown if a locale is missing a translation for it.
+export const EQUIPMENT_ITEMS = [
+  { value: 'brett', label: 'Schwimmbrett' },
+  { value: 'pullbuoy', label: 'Pull Buoy' },
+  { value: 'flossen', label: 'Flossen' },
+  { value: 'kurzflossen', label: 'Kurzflossen' },
+  { value: 'paddles', label: 'Paddles' },
+  { value: 'schnorchel', label: 'Schnorchel' },
+  { value: 'zugband', label: 'Zugband / Stretchcordel' },
+  { value: 'bremswiderstand', label: 'Bremswiderstand (Parachute/Bucket)' },
+  { value: 'medizinball', label: 'Medizinball' },
+  { value: 'startblock', label: 'Startblock' },
+];
+
 export const SET_INTENSITIES = [
   { value: 'locker', label: 'Locker (GA2)' },
   { value: 'ga1', label: 'Grundlage (GA1)' },
