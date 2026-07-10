@@ -33,6 +33,22 @@ export function esc(str) {
 
 export function clear(node){ while (node.firstChild) node.removeChild(node.firstChild); }
 
+// ---- Render guard ----
+// Modules call `const isCurrent = beginRender(container)` at the very
+// start of their render(). After any `await` (data fetching), a module
+// should check `if (!isCurrent()) return;` before touching the DOM again.
+// This prevents a stale, slower render call — e.g. one superseded by a
+// second render triggered right after it (such as a locale change firing
+// two change events back-to-back) — from appending content after a newer
+// render has already drawn the view, which is what caused duplicated
+// module content on language switch.
+const renderTokens = new WeakMap();
+export function beginRender(container) {
+  const token = Symbol('render');
+  renderTokens.set(container, token);
+  return () => renderTokens.get(container) === token;
+}
+
 // ---- Dates ----
 export function todayISO() { return new Date().toISOString().slice(0, 10); }
 export function nowISO(){ return new Date().toISOString(); }
