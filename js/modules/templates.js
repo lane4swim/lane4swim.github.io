@@ -2,7 +2,7 @@
 // modules/templates.js — wiederverwendbare Trainingsplan-Vorlagen
 // ============================================================
 import { getAll, put, remove, uid } from '../db.js';
-import { el, clear, field, textInput, openModal, confirmAction, toast, badge, emptyState, laneWave } from '../utils.js';
+import { el, clear, field, textInput, openModal, confirmAction, toast, badge, emptyState, laneWave, beginRender } from '../utils.js';
 import { renderSetEditor, totalDistance, cloneItems } from './setEditor.js';
 import { t } from '../i18n.js';
 
@@ -11,8 +11,10 @@ export const templatesModule = {
   roles: ['trainer', 'admin'],
   icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="4" rx="1"/><rect x="3" y="11" width="8" height="9" rx="1"/><rect x="13" y="11" width="8" height="9" rx="1"/></svg>`,
   async render(container) {
+    const isCurrent = beginRender(container);
     clear(container);
     const [templates, exercises] = await Promise.all([getAll('templates'), getAll('exercises')]);
+    if (!isCurrent()) return;
     renderList(container, templates, exercises);
   }
 };
