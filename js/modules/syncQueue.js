@@ -31,7 +31,6 @@ export const syncQueueModule = {
     clear(container);
     const queue = await getSyncQueue();
     if (!isCurrent()) return;
-    const queue = await getSyncQueue();
     renderView(container, queue);
   }
 };
