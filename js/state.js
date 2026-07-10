@@ -64,6 +64,19 @@ export async function upsertUser(user) {
   return saved;
 }
 
+// Updates the *current* user's own personal data (e.g. name, email) —
+// used by the "Mein Profil" / "My Profile" module. Unlike setUserLocale(),
+// this legitimately should notify onUserChange listeners (the account
+// picker's displayed name needs to refresh), and since it never also
+// calls setLocale() there's no risk of the double-render issue that
+// setUserLocale() specifically works around.
+export async function updateProfile(patch) {
+  if (!current) return null;
+  current = await put('users', { ...current, ...patch });
+  emit();
+  return current;
+}
+
 export function isTrainerOrAdmin() {
   return ['trainer', 'admin'].includes(getRole());
 }
