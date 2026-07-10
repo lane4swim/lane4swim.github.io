@@ -4,7 +4,7 @@
 import { getAll, put, remove, uid } from '../db.js';
 import {
   el, clear, field, textInput, selectInput, openModal, confirmAction, toast, badge,
-  emptyState, laneWave, fmtDateLong, fmtDateShort, todayISO, isoAddDays, startOfWeek,
+  emptyState, laneWave, fmtDateLong, fmtDateShort, todayISO, isoAddDays, startOfWeek, beginRender,
 } from '../utils.js';
 import { WEEKDAYS } from '../refdata.js';
 import { renderSetEditor, totalDistance, cloneItems } from './setEditor.js';
@@ -16,8 +16,10 @@ export const plansModule = {
   roles: ['trainer', 'admin', 'athlete'],
   icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9.5h18"/><path d="M8 2.5v4M16 2.5v4"/></svg>`,
   async render(container, params) {
+    const isCurrent = beginRender(container);
     clear(container);
     const [plans, groups, templates, exercises] = await Promise.all([getAll('plans'), getAll('groups'), getAll('templates'), getAll('exercises')]);
+    if (!isCurrent()) return;
     if (params[0]) return renderDetail(container, params[0]);
     renderList(container, plans, groups, templates, exercises);
   }
