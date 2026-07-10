@@ -10,7 +10,7 @@
 // ============================================================
 import { getSyncQueue, updateSyncEvent, clearSyncedEvents, pendingSyncCount, remove } from '../db.js';
 import {
-  el, clear, badge, emptyState, laneWave, toast, confirmAction,
+  el, clear, badge, emptyState, laneWave, toast, confirmAction, beginRender,
 } from '../utils.js';
 import { t, getLocale } from '../i18n.js';
 
@@ -27,7 +27,10 @@ export const syncQueueModule = {
   roles: ['trainer', 'admin'],
   icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4v6h6"/><path d="M20 20v-6h-6"/><path d="M5.6 15a8 8 0 0013.9 2.3M18.4 9a8 8 0 00-13.9-2.3"/></svg>`,
   async render(container) {
+    const isCurrent = beginRender(container);
     clear(container);
+    const queue = await getSyncQueue();
+    if (!isCurrent()) return;
     const queue = await getSyncQueue();
     renderView(container, queue);
   }
