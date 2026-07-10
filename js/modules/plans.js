@@ -6,10 +6,10 @@ import {
   el, clear, field, textInput, selectInput, openModal, confirmAction, toast, badge,
   emptyState, laneWave, fmtDateLong, fmtDateShort, todayISO, isoAddDays, startOfWeek, beginRender,
 } from '../utils.js';
-import { WEEKDAYS } from '../refdata.js';
-import { renderSetEditor, totalDistance, cloneItems } from './setEditor.js';
+import { WEEKDAYS, EQUIPMENT_ITEMS } from '../refdata.js';
+import { renderSetEditor, totalDistance, cloneItems, collectEquipment } from './setEditor.js';
 import { navigate } from '../router.js';
-import { t } from '../i18n.js';
+import { t, trLabel } from '../i18n.js';
 
 export const plansModule = {
   id: 'plans',
@@ -71,13 +71,20 @@ async function renderDetail(container, planId) {
   wrap.appendChild(el('p', {}, t('plans.statusLine', { date: fmtDateLong(plan.weekStart), status: plan.status === 'aktiv' ? t('plans.statusActive') : t('plans.statusArchived') })));
 
   (plan.days || []).slice().sort((a, b) => a.date.localeCompare(b.date)).forEach(day => {
+    const dayEquipment = collectEquipment(day.sets || [], exercises);
     const dayCard = el('div', { class: 'card' }, [
       el('div', { class: 'day-block-head' }, [
         el('h3', { class: 'mt-0' }, fmtDateLong(day.date)),
-        badge(t('plans.totalBadge', { m: totalDistance(day.sets || []) }), 'neutral'),
+        el('div', { class: 'flex items-center gap-8' }, [
+          badge(t('plans.totalBadge', { m: totalDistance(day.sets || []) }), 'neutral'),
+        ]),
       ]),
     ]);
-    dayCard.appendChild(renderDayItems(day.sets || []));
+    dayCard.appendChild(el('p', { class: 'text-sm', style: 'margin-top:-8px' },
+      dayEquipment.length > 0
+        ? `${t('setEditor.equipmentSummary')} ${dayEquipment.map(eq => trLabel(EQUIPMENT_ITEMS, eq, 'equipment')).join(', ')}`
+        : t('setEditor.equipmentNone')));
+    dayCard.appendChild(renderDayItems(day.sets || [], exercises));
     wrap.appendChild(dayCard);
   });
 
@@ -89,7 +96,7 @@ async function renderDetail(container, planId) {
 // the table and is shown as its own distinct box — same visual language
 // (dashed border, "repeat block" badge) as the editor uses, so the
 // reading view and the editing view stay recognizably consistent.
-function renderDayItems(items) {
+function renderDayItems(items, exercises) {
   const host = el('div');
   if (items.length === 0) { host.appendChild(el('p', {}, t('plans.noSetsPlanned'))); return host; }
 
@@ -108,10 +115,10 @@ function renderDayItems(items) {
   items.forEach(entry => {
     if (entry.kind === 'block') {
       flushTable();
-      host.appendChild(renderBlockBox(entry));
+      host.appendChild(renderBlockBox(entry, exercises));
     } else {
       pendingRows.push(el('tr', {}, [
-        el('td', {}, entry.description || '—'), el('td', {}, `${entry.distance ?? '—'} m`), el('td', {}, entry.reps), el('td', {}, `${entry.restSec || 0}s`),
+        el('td', {}, equipmentDescCell(entry, exercises)), el('td', {}, `${entry.distance ?? '—'} m`), el('td', {}, entry.reps), el('td', {}, `${entry.restSec || 0}s`),
       ]));
     }
   });
@@ -119,20 +126,42 @@ function renderDayItems(items) {
   return host;
 }
 
-function renderBlockBox(block) {
+// Builds the "Beschreibung" cell content: the set's text, plus a small
+// equipment badge row underneath if it's linked to a catalog exercise
+// that needs equipment — this is what was missing from the read-only
+// plan view (equipment was only ever shown inside the edit dialog).
+function equipmentDescCell(entry, exercises) {
+  const wrap = el('div');
+  wrap.appendChild(el('div', {}, entry.description || '—'));
+  if (entry.exerciseId) {
+    const ex = (exercises || []).find(x => x.id === entry.exerciseId);
+    if (ex && (ex.equipment || []).length > 0) {
+      wrap.appendChild(el('div', { class: 'pill-group', style: 'margin-top:3px' },
+        ex.equipment.map(eq => badge(trLabel(EQUIPMENT_ITEMS, eq, 'equipment'), 'pb'))));
+    }
+  }
+  return wrap;
+}
+
+function renderBlockBox(block, exercises) {
   const innerDist = totalDistance(block.sets || []);
+  const blockEquipment = collectEquipment(block.sets || [], exercises);
   const box = el('div', { class: 'day-block', style: 'margin:4px 0 12px;border-style:dashed;border-color:var(--c-chlorine-d);background:var(--c-foam-2)' });
   box.appendChild(el('div', { class: 'day-block-head' }, [
     el('div', { class: 'flex items-center gap-8' }, [badge(t('plans.repeatBlockLabel', { n: block.repeatCount || 1 }), 'progress'), el('strong', {}, block.label || t('templates.defaultBlockLabel'))]),
     badge(t('plans.totalBadge', { m: innerDist * (block.repeatCount || 1) }), 'neutral'),
   ]));
+  if (blockEquipment.length > 0) {
+    box.appendChild(el('p', { class: 'text-sm', style: 'margin-top:-6px' },
+      `${t('setEditor.equipmentSummary')} ${blockEquipment.map(eq => trLabel(EQUIPMENT_ITEMS, eq, 'equipment')).join(', ')}`));
+  }
   if (!block.sets || block.sets.length === 0) {
     box.appendChild(el('p', { class: 'hint mt-0' }, t('plans.blockNoSets')));
   } else {
     const table = el('table');
     table.appendChild(el('thead', {}, el('tr', {}, [el('th', {}, t('plans.colDescription')), el('th', {}, t('plans.colDistance')), el('th', {}, t('plans.colReps')), el('th', {}, t('plans.colRest'))])));
     const tbody = el('tbody');
-    block.sets.forEach(s => tbody.appendChild(el('tr', {}, [el('td', {}, s.description || '—'), el('td', {}, `${s.distance ?? '—'} m`), el('td', {}, s.reps), el('td', {}, `${s.restSec || 0}s`)])));
+    block.sets.forEach(s => tbody.appendChild(el('tr', {}, [el('td', {}, equipmentDescCell(s, exercises)), el('td', {}, `${s.distance ?? '—'} m`), el('td', {}, s.reps), el('td', {}, `${s.restSec || 0}s`)])));
     table.appendChild(tbody);
     box.appendChild(el('div', { class: 'table-wrap' }, table));
   }
