@@ -6,10 +6,10 @@ import { el, clear, fmtDateLong, todayISO, fullName, statCard, badge, laneWave, 
 import { getRole, getCurrentUser } from '../state.js';
 import { navigate } from '../router.js';
 import { totalDistance } from './setEditor.js';
+import { t, trCode } from '../i18n.js';
 
 export const dashboardModule = {
   id: 'dashboard',
-  label: 'Dashboard',
   icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="5" rx="1.5"/><rect x="13" y="11" width="8" height="10" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/></svg>`,
   async render(container) {
     clear(container);
@@ -34,24 +34,24 @@ async function renderTrainerDashboard(container) {
 
   const wrap = el('div');
   wrap.appendChild(el('div', { class: 'page-head' }, [
-    el('div', {}, [el('div', { class: 'page-eyebrow' }, 'Übersicht'), el('h1', { class: 'mt-0' }, 'Willkommen zurück')]),
+    el('div', {}, [el('div', { class: 'page-eyebrow' }, t('dashboard.eyebrow')), el('h1', { class: 'mt-0' }, t('dashboard.welcome'))]),
   ]));
   wrap.appendChild(laneWave());
 
   const stats = el('div', { class: 'grid grid-4 mb-16' }, [
-    statCard({ label: 'Aktive Athleten', value: athletes.filter(a => a.active).length, sub: `${groups.length} Gruppen` }),
-    statCard({ label: 'Nächster Wettkampf', value: upcomingComps[0] ? fmtDateLong(upcomingComps[0].date) : '—', sub: upcomingComps[0]?.name || 'Keiner geplant', alt: true }),
-    statCard({ label: 'Offene Handlungsfelder', value: openActions.length, sub: `${actionItems.length} gesamt` }),
-    statCard({ label: 'Geplante Einheiten', value: upcomingPlanDays.length, sub: 'kommend', alt: true }),
+    statCard({ label: t('dashboard.statActiveAthletes'), value: athletes.filter(a => a.active).length, sub: t('dashboard.statGroups', { count: groups.length }) }),
+    statCard({ label: t('dashboard.statNextComp'), value: upcomingComps[0] ? fmtDateLong(upcomingComps[0].date) : '—', sub: upcomingComps[0]?.name || t('dashboard.statNoComp'), alt: true }),
+    statCard({ label: t('dashboard.statOpenActions'), value: openActions.length, sub: t('dashboard.statActionsTotal', { count: actionItems.length }) }),
+    statCard({ label: t('dashboard.statPlannedSessions'), value: upcomingPlanDays.length, sub: t('dashboard.statUpcoming'), alt: true }),
   ]);
   wrap.appendChild(stats);
 
   const grid = el('div', { class: 'grid grid-2' });
 
-  const planCard = el('div', { class: 'card' }, [el('h3', {}, 'Nächste Trainingseinheiten')]);
+  const planCard = el('div', { class: 'card' }, [el('h3', {}, t('dashboard.nextSessionsTitle'))]);
   if (upcomingPlanDays.length === 0) {
-    planCard.appendChild(el('p', {}, 'Keine geplanten Einheiten in der Zukunft.'));
-    planCard.appendChild(el('button', { class: 'btn btn-primary btn-sm', onclick: () => navigate('plans') }, 'Plan erstellen'));
+    planCard.appendChild(el('p', {}, t('dashboard.noUpcomingSessions')));
+    planCard.appendChild(el('button', { class: 'btn btn-primary btn-sm', onclick: () => navigate('plans') }, t('dashboard.createPlan')));
   } else {
     upcomingPlanDays.slice(0, 5).forEach(({ plan, day }) => {
       const group = groups.find(g => g.id === plan.groupId);
@@ -59,16 +59,16 @@ async function renderTrainerDashboard(container) {
         el('div', { class: 'avatar' }, (group?.name || '?').slice(0, 2).toUpperCase()),
         el('div', { style: 'flex:1' }, [
           el('div', {}, `${fmtDateLong(day.date)}`),
-          el('div', { class: 'text-slate text-sm' }, `${plan.name} · ${totalDistance(day.sets || [])} m geplant`),
+          el('div', { class: 'text-slate text-sm' }, `${plan.name} · ${t('dashboard.metersPlanned', { count: totalDistance(day.sets || []) })}`),
         ]),
       ]));
     });
   }
   grid.appendChild(planCard);
 
-  const compCard = el('div', { class: 'card' }, [el('h3', {}, 'Anstehende Wettkämpfe')]);
+  const compCard = el('div', { class: 'card' }, [el('h3', {}, t('dashboard.upcomingCompsTitle'))]);
   if (upcomingComps.length === 0) {
-    compCard.appendChild(el('p', {}, 'Kein Wettkampf in Planung.'));
+    compCard.appendChild(el('p', {}, t('dashboard.noUpcomingComps')));
   } else {
     upcomingComps.slice(0, 4).forEach(c => {
       compCard.appendChild(el('div', { class: 'list-row row-click', onclick: () => navigate('competitions', c.id) }, [
@@ -80,12 +80,12 @@ async function renderTrainerDashboard(container) {
       ]));
     });
   }
-  compCard.appendChild(el('button', { class: 'btn btn-ghost btn-sm', style: 'margin-top:8px', onclick: () => navigate('competitions') }, 'Alle Wettkämpfe →'));
+  compCard.appendChild(el('button', { class: 'btn btn-ghost btn-sm', style: 'margin-top:8px', onclick: () => navigate('competitions') }, t('dashboard.allComps')));
   grid.appendChild(compCard);
 
-  const actionCard = el('div', { class: 'card' }, [el('h3', {}, 'Offene Handlungsfelder')]);
+  const actionCard = el('div', { class: 'card' }, [el('h3', {}, t('dashboard.openActionsTitle'))]);
   if (openActions.length === 0) {
-    actionCard.appendChild(el('p', {}, 'Aktuell keine offenen Punkte. Gute Arbeit!'));
+    actionCard.appendChild(el('p', {}, t('dashboard.noOpenActions')));
   } else {
     openActions.slice(0, 5).forEach(a => {
       const athlete = athletes.find(x => x.id === a.athleteId);
@@ -95,16 +95,16 @@ async function renderTrainerDashboard(container) {
           el('div', {}, a.title),
           el('div', { class: 'text-slate text-sm' }, fullName(athlete)),
         ]),
-        badge(a.status === 'progress' ? 'In Bearbeitung' : 'Offen', a.status === 'progress' ? 'progress' : 'open'),
+        badge(a.status === 'progress' ? t('refdata.actionStatus.progress') : t('refdata.actionStatus.offen'), a.status === 'progress' ? 'progress' : 'open'),
       ]));
     });
   }
-  actionCard.appendChild(el('button', { class: 'btn btn-ghost btn-sm', style: 'margin-top:8px', onclick: () => navigate('actionitems') }, 'Alle Handlungsfelder →'));
+  actionCard.appendChild(el('button', { class: 'btn btn-ghost btn-sm', style: 'margin-top:8px', onclick: () => navigate('actionitems') }, t('dashboard.allActions')));
   grid.appendChild(actionCard);
 
-  const sessionCard = el('div', { class: 'card' }, [el('h3', {}, 'Letzte Trainingseinheiten')]);
+  const sessionCard = el('div', { class: 'card' }, [el('h3', {}, t('dashboard.recentSessionsTitle'))]);
   if (recentSessions.length === 0) {
-    sessionCard.appendChild(el('p', {}, 'Noch keine Einheiten erfasst.'));
+    sessionCard.appendChild(el('p', {}, t('dashboard.noSessions')));
   } else {
     recentSessions.forEach(s => {
       const present = s.attendance?.filter(a => a.present).length || 0;
@@ -113,12 +113,12 @@ async function renderTrainerDashboard(container) {
       sessionCard.appendChild(el('div', { class: 'list-row row-click', onclick: () => navigate('sessions', s.id) }, [
         el('div', { style: 'flex:1' }, [
           el('div', {}, fmtDateLong(s.date)),
-          el('div', { class: 'text-slate text-sm' }, `Anwesend ${present}/${total}${rpeAvg ? ` · Ø RPE ${rpeAvg.toFixed(1)}` : ''}`),
+          el('div', { class: 'text-slate text-sm' }, `${t('dashboard.attendanceLine', { present, total })}${rpeAvg ? t('dashboard.avgRpe', { rpe: rpeAvg.toFixed(1) }) : ''}`),
         ]),
       ]));
     });
   }
-  sessionCard.appendChild(el('button', { class: 'btn btn-ghost btn-sm', style: 'margin-top:8px', onclick: () => navigate('sessions') }, 'Alle Einheiten →'));
+  sessionCard.appendChild(el('button', { class: 'btn btn-ghost btn-sm', style: 'margin-top:8px', onclick: () => navigate('sessions') }, t('dashboard.allSessions')));
   grid.appendChild(sessionCard);
 
   wrap.appendChild(grid);
@@ -133,12 +133,12 @@ async function renderAthleteDashboard(container) {
   const me = athletes.find(a => a.id === user?.athleteId);
   const wrap = el('div');
   wrap.appendChild(el('div', { class: 'page-head' }, [
-    el('div', {}, [el('div', { class: 'page-eyebrow' }, 'Mein Training'), el('h1', { class: 'mt-0' }, me ? `Hallo, ${me.firstName}!` : 'Willkommen')]),
+    el('div', {}, [el('div', { class: 'page-eyebrow' }, t('dashboard.athleteEyebrow')), el('h1', { class: 'mt-0' }, me ? t('dashboard.helloAthlete', { name: me.firstName }) : t('dashboard.welcomeAthlete'))]),
   ]));
   wrap.appendChild(laneWave());
 
   if (!me) {
-    wrap.appendChild(el('p', {}, 'Kein Athletenprofil mit diesem Konto verknüpft.'));
+    wrap.appendChild(el('p', {}, t('dashboard.noAthleteProfile')));
     container.appendChild(wrap);
     return;
   }
@@ -154,29 +154,29 @@ async function renderAthleteDashboard(container) {
   const myActions = actionItems.filter(a => a.athleteId === me.id);
 
   wrap.appendChild(el('div', { class: 'grid grid-3 mb-16' }, [
-    statCard({ label: 'Persönliche Bestzeiten', value: Object.keys(pbs).length, sub: 'Disziplinen' }),
-    statCard({ label: 'Nächstes Training', value: nextDay[0] ? fmtDateLong(nextDay[0].d.date) : '—', sub: nextDay[0]?.p.name || '', alt: true }),
-    statCard({ label: 'Offene Ziele', value: myActions.filter(a => a.status !== 'done').length, sub: `${myActions.length} gesamt` }),
+    statCard({ label: t('dashboard.statPBs'), value: Object.keys(pbs).length, sub: t('dashboard.disciplines') }),
+    statCard({ label: t('dashboard.statNextSession'), value: nextDay[0] ? fmtDateLong(nextDay[0].d.date) : '—', sub: nextDay[0]?.p.name || '', alt: true }),
+    statCard({ label: t('dashboard.statOpenGoals'), value: myActions.filter(a => a.status !== 'done').length, sub: t('dashboard.statActionsTotal', { count: myActions.length }) }),
   ]));
 
   const grid = el('div', { class: 'grid grid-2' });
 
-  const pbCard = el('div', { class: 'card' }, [el('h3', {}, 'Aktuelle Bestzeiten')]);
+  const pbCard = el('div', { class: 'card' }, [el('h3', {}, t('dashboard.currentPBsTitle'))]);
   if (Object.keys(pbs).length === 0) {
-    pbCard.appendChild(el('p', {}, 'Noch keine Zeiten erfasst.'));
+    pbCard.appendChild(el('p', {}, t('dashboard.noTimesYet')));
   } else {
     Object.entries(pbs).forEach(([evt, list]) => {
       const best = list.reduce((a, b) => (a.time < b.time ? a : b));
       pbCard.appendChild(el('div', { class: 'list-row' }, [
-        el('div', { style: 'flex:1' }, evt),
+        el('div', { style: 'flex:1' }, trCode(evt, 'events')),
         el('div', { class: 'data' }, secToTime(best.time)),
       ]));
     });
   }
   grid.appendChild(pbCard);
 
-  const compCard = el('div', { class: 'card' }, [el('h3', {}, 'Anstehende Wettkämpfe')]);
-  if (upcomingComps.length === 0) compCard.appendChild(el('p', {}, 'Aktuell nichts geplant.'));
+  const compCard = el('div', { class: 'card' }, [el('h3', {}, t('dashboard.upcomingCompsShort'))]);
+  if (upcomingComps.length === 0) compCard.appendChild(el('p', {}, t('dashboard.noneScheduled')));
   else upcomingComps.slice(0, 4).forEach(c => compCard.appendChild(el('div', { class: 'list-row' }, [
     el('div', { style: 'flex:1' }, [el('div', {}, c.name), el('div', { class: 'text-slate text-sm' }, fmtDateLong(c.date))]),
   ])));
