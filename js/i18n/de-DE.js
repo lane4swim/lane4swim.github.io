@@ -171,6 +171,8 @@ export default {
     formName: 'Name', formCategory: 'Kategorie', formStroke: 'Schwimmlage', noStroke: '— unabhängig —',
     formDistance: 'Standarddistanz (m)', formDistancePlaceholder: 'z. B. 100',
     formTags: 'Tags', formTagsHint: 'kommagetrennt', formDescription: 'Beschreibung',
+    formEquipment: 'Benötigte Ausrüstung', formEquipmentHint: 'Mehrfachauswahl möglich',
+    noEquipment: 'Keine Ausrüstung nötig',
     validationName: 'Bitte einen Namen angeben.', savedEdit: 'Änderungen gespeichert', savedCreate: 'Übung angelegt',
   },
   sessions: {
@@ -259,6 +261,7 @@ export default {
     removeBlock: 'Block entfernen', blockNamePlaceholder: 'Blockname, z. B. „Hauptserie"',
     fromCatalogHint: 'aus Übungskatalog: {name}', noSetsInBlock: 'Noch keine Sätze in diesem Block.',
     blockSummary: 'Blockdistanz: {inner} m je Durchgang × {n} = {total} m gesamt',
+    equipmentSummary: 'Benötigte Ausrüstung:', equipmentNone: 'Keine Ausrüstung nötig',
   },
   refdata: {
     courses: { LCM: 'LCM · 50m Bahn', SCM: 'SCM · 25m Bahn' },
@@ -274,6 +277,11 @@ export default {
       verhalten: 'Verhalten / Einstellung', verletzung: 'Gesundheit / Belastung', sonstiges: 'Sonstiges',
     },
     actionStatus: { offen: 'Offen', progress: 'In Bearbeitung', done: 'Erledigt' },
+    equipment: {
+      brett: 'Schwimmbrett', pullbuoy: 'Pull Buoy', flossen: 'Flossen', kurzflossen: 'Kurzflossen',
+      paddles: 'Paddles', schnorchel: 'Schnorchel', zugband: 'Zugband / Stretchcordel',
+      bremswiderstand: 'Bremswiderstand (Parachute/Bucket)', medizinball: 'Medizinball', startblock: 'Startblock',
+    },
     events: {
       '50 Freistil': '50 Freistil', '100 Freistil': '100 Freistil', '200 Freistil': '200 Freistil',
       '400 Freistil': '400 Freistil', '800 Freistil': '800 Freistil', '1500 Freistil': '1500 Freistil',
