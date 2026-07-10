@@ -4,7 +4,7 @@
 import { getAll, put, remove } from '../db.js';
 import {
   el, clear, field, textInput, selectInput, openModal, confirmAction, toast, badge,
-  emptyState, laneWave, fmtDateLong, todayISO, average, fullName,
+  emptyState, laneWave, fmtDateLong, todayISO, average, fullName, beginRender,
 } from '../utils.js';
 import { getRole, getCurrentUser } from '../state.js';
 import { navigate } from '../router.js';
@@ -15,10 +15,12 @@ export const sessionsModule = {
   roles: ['trainer', 'admin', 'athlete'],
   icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4v16l4-2 4 2 4-2 4 2V4l-4 2-4-2-4 2-4-2z"/><path d="M9 9h6M9 13h4"/></svg>`,
   async render(container, params) {
+    const isCurrent = beginRender(container);
     clear(container);
     const role = getRole();
-    if (role === 'athlete') return renderAthleteView(container);
+    if (role === 'athlete') return renderAthleteView(container, isCurrent);
     const [sessions, groups, athletes, plans] = await Promise.all(['sessions', 'groups', 'athletes', 'plans'].map(getAll));
+    if (!isCurrent()) return;
     if (params[0]) return renderDetail(container, params[0]);
     renderList(container, sessions, groups, athletes, plans);
   }
@@ -93,9 +95,10 @@ async function renderDetail(container, sessionId) {
   container.appendChild(wrap);
 }
 
-async function renderAthleteView(container) {
+async function renderAthleteView(container, isCurrent) {
   const user = getCurrentUser();
   const [sessions, athletes, groups] = await Promise.all(['sessions', 'athletes', 'groups'].map(getAll));
+  if (!isCurrent()) return;
   const me = athletes.find(a => a.id === user?.athleteId);
   const wrap = el('div');
   wrap.appendChild(el('div', { class: 'page-head' }, [el('div', {}, [el('div', { class: 'page-eyebrow' }, t('sessions.myTrainingEyebrow')), el('h1', { class: 'mt-0' }, t('sessions.myTitle'))])]));
