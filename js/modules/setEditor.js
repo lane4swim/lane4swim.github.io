@@ -11,9 +11,10 @@
 // Entries without a `kind` (older saved data) are treated as plain sets
 // for backward compatibility — no data migration needed.
 // ============================================================
-import { el, clear, uid, selectInput, badge } from '../utils.js';
+import { el, clear, uid, selectInput, badge, toast } from '../utils.js';
 import { SET_INTENSITIES, EXERCISE_CATEGORIES, EQUIPMENT_ITEMS } from '../refdata.js';
 import { t, trLabel, trOptions } from '../i18n.js';
+import { put } from '../db.js';
 
 // Sensible defaults when a set is created from a catalog exercise,
 // since exercises don't carry pool-intensity/rest data themselves.
@@ -106,8 +107,10 @@ function buildExerciseOptions(exercises) {
 }
 
 // Renders one plain-set row. `onRemove` is called when the row's × is clicked;
-// the caller owns the array and re-draws itself afterwards.
-function buildSetRow(s, exercises, onRemove) {
+// the caller owns the array and re-draws itself afterwards. `onEquipmentChange`
+// (optional) is called after the linked exercise's equipment is edited inline,
+// so the caller can refresh any aggregate summary that depends on it.
+function buildSetRow(s, exercises, onRemove, onEquipmentChange) {
   const row = el('div', { class: 'set-row' }, [
     el('input', { type: 'number', min: '0', value: s.distance ?? '', oninput: (e) => s.distance = e.target.value ? parseInt(e.target.value) : null }),
     el('input', { type: 'text', value: s.description || '', placeholder: t('setEditor.descriptionPlaceholder'), oninput: (e) => s.description = e.target.value }),
@@ -120,15 +123,56 @@ function buildSetRow(s, exercises, onRemove) {
     style: 'grid-column:2/3;margin-top:4px',
   });
   row.appendChild(intensitySel);
+
   if (s.exerciseId) {
     const ex = exercises.find(x => x.id === s.exerciseId);
     if (ex) {
       row.appendChild(el('span', { class: 'hint', style: 'grid-column:2/3' }, t('setEditor.fromCatalogHint', { name: ex.name })));
-      if ((ex.equipment || []).length > 0) {
-        const eqRow = el('div', { class: 'pill-group', style: 'grid-column:2/3;margin-top:2px' },
-          ex.equipment.map(eq => badge(trLabel(EQUIPMENT_ITEMS, eq, 'equipment'), 'pb')));
-        row.appendChild(eqRow);
+
+      // Read-only equipment badges + an inline, persistent editor toggle.
+      // Equipment lives on the *exercise* (catalog entry), not the set —
+      // editing it here updates the same 'exercises' record used by the
+      // Übungskatalog module, it's just a faster path while building a
+      // plan/template so you don't have to leave the editor.
+      const eqDisplay = el('div', { style: 'grid-column:2/3' });
+      row.appendChild(eqDisplay);
+      const eqEditorHost = el('div', { style: 'grid-column:2/3;margin-top:4px' });
+      row.appendChild(eqEditorHost);
+      let editorOpen = false;
+
+      function drawDisplay() {
+        clear(eqDisplay);
+        const badges = (ex.equipment || []).map(eq => badge(trLabel(EQUIPMENT_ITEMS, eq, 'equipment'), 'pb'));
+        const editBtn = el('button', {
+          type: 'button', class: 'btn btn-ghost btn-sm', style: 'margin-top:2px',
+          onclick: () => { editorOpen = !editorOpen; drawEditor(); },
+        }, editorOpen ? t('common.close') : t('setEditor.editEquipment'));
+        eqDisplay.appendChild(el('div', { class: 'pill-group', style: 'margin-top:2px' }, [...badges, editBtn]));
       }
+
+      function drawEditor() {
+        clear(eqEditorHost);
+        if (!editorOpen) { drawDisplay(); return; }
+        const selected = new Set(ex.equipment || []);
+        const pills = el('div', { class: 'pill-group' });
+        EQUIPMENT_ITEMS.forEach(eq => {
+          const pill = el('button', {
+            type: 'button', class: `pill ${selected.has(eq.value) ? 'active' : ''}`,
+            onclick: async () => {
+              if (selected.has(eq.value)) selected.delete(eq.value); else selected.add(eq.value);
+              pill.classList.toggle('active');
+              ex.equipment = [...selected];
+              await put('exercises', { ...ex });
+              drawDisplay();
+              onEquipmentChange?.();
+            },
+          }, trLabel(EQUIPMENT_ITEMS, eq.value, 'equipment'));
+          pills.appendChild(pill);
+        });
+        eqEditorHost.appendChild(pills);
+        drawDisplay();
+      }
+      drawDisplay();
     }
   }
   return row;
@@ -169,7 +213,7 @@ function buildBlockRow(block, exercises, onRemoveBlock, onRedrawParent) {
   function drawInner() {
     clear(innerHost);
     (block.sets || []).forEach((s, si) => {
-      innerHost.appendChild(buildSetRow(s, exercises, () => { block.sets.splice(si, 1); drawInner(); updateSubtotal(); onRedrawParent(); }));
+      innerHost.appendChild(buildSetRow(s, exercises, () => { block.sets.splice(si, 1); drawInner(); updateSubtotal(); onRedrawParent(); }, onRedrawParent));
     });
     if (!block.sets || block.sets.length === 0) {
       innerHost.appendChild(el('p', { class: 'hint', style: 'padding:4px 0' }, t('setEditor.noSetsInBlock')));
@@ -235,7 +279,7 @@ export function renderSetEditor(hostNode, items, exercises = []) {
       if (entry.kind === 'block') {
         rowsHost.appendChild(buildBlockRow(entry, exercises, () => { items.splice(i, 1); draw(); }, updateTotal));
       } else {
-        rowsHost.appendChild(buildSetRow(entry, exercises, () => { items.splice(i, 1); draw(); }));
+        rowsHost.appendChild(buildSetRow(entry, exercises, () => { items.splice(i, 1); draw(); }, updateTotal));
       }
     });
     if (items.length === 0) {
