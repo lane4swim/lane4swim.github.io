@@ -262,6 +262,7 @@ export default {
     fromCatalogHint: 'aus Übungskatalog: {name}', noSetsInBlock: 'Noch keine Sätze in diesem Block.',
     blockSummary: 'Blockdistanz: {inner} m je Durchgang × {n} = {total} m gesamt',
     equipmentSummary: 'Benötigte Ausrüstung:', equipmentNone: 'Keine Ausrüstung nötig',
+    editEquipment: 'Ausrüstung bearbeiten',
   },
   refdata: {
     courses: { LCM: 'LCM · 50m Bahn', SCM: 'SCM · 25m Bahn' },
