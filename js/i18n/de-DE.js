@@ -114,6 +114,12 @@ export default {
     placeNeedsTimeFirst: 'Bitte zuerst eine Ergebniszeit erfassen.',
     entryDeleteConfirm: 'Diesen Startlisteneintrag entfernen? (Bereits erfasste Ergebniszeiten bleiben erhalten.)',
     entryRemoved: 'Eintrag entfernt', placeHeader: 'Platzierung',
+    stopwatchToggle: 'Stoppuhr', stopwatchStart: 'Start', stopwatchLap: 'Runde',
+    stopwatchStop: 'Stopp', stopwatchReset: 'Zurücksetzen', stopwatchApply: 'Zeit übernehmen',
+    stopwatchNoLaps: 'Noch keine Rundenzeiten.', stopwatchLapNr: 'Runde',
+    stopwatchLapSplit: 'Rundenzeit', stopwatchLapTotal: 'Gesamtzeit',
+    stopwatchApplied: 'Zeit aus Stoppuhr übernommen — jetzt „Speichern" nicht vergessen.',
+    stopwatchLapCount: '{count} Rundenzeiten',
   },
   times: {
     eyebrow: '{count} erfasste Zeiten', title: 'Zeiten & Leistung', addTime: '+ Zeit erfassen',
