@@ -100,7 +100,7 @@ async function renderDetail(container, compId) {
       const athlete = athletes.find(a => a.id === r.athleteId);
       tbody.appendChild(el('tr', {}, [
         el('td', {}, fullName(athlete)), el('td', {}, trCode(r.event, 'events')), el('td', { class: 'data' }, secToTime(r.time)),
-        el('td', {}, r.place ? `${r.place}.` : '—'), el('td', {}, r.isPB ? badge('PB', 'pb') : ''),
+        el('td', {}, r.place ? `${r.place}.` : '—'), el('td', {}, [r.isPB ? badge('PB', 'pb') : null, r.laps?.length > 0 ? ' ' : null, r.laps?.length > 0 ? badge(t('competitions.stopwatchLapCount', { count: r.laps.length }), 'neutral') : null].filter(Boolean)),
         el('td', {}, el('button', { class: 'btn btn-danger btn-sm', onclick: async () => { await remove('results', r.id); toast(t('competitions.deleteResultDone')); refreshDetail(); } }, t('common.remove'))),
       ]));
     });
@@ -129,7 +129,7 @@ async function renderDetail(container, compId) {
       ])));
       const tbody = el('tbody');
       groups[key].sort((a, b) => (a.lane ?? 99) - (b.lane ?? 99)).forEach(entry => {
-        tbody.appendChild(buildEntryRow(entry, comp, athletes, results, refreshDetail));
+        appendEntryRows(tbody, entry, comp, athletes, results, refreshDetail);
       });
       table.appendChild(tbody);
       startListCard.appendChild(el('div', { class: 'table-wrap mb-8' }, table));
@@ -155,13 +155,17 @@ function findResultForEntry(results, entry) {
   return results.find(r => r.competitionId === entry.competitionId && r.athleteId === entry.athleteId && r.event === entry.event) || null;
 }
 
-// One start-list row: shows lane/number/athlete/event/seed time, plus an
-// inline time field + save button for quick result capture — this writes
-// straight into the 'results' store (same one used everywhere else in the
-// app), so a captured time immediately shows up in Times & Statistics.
-function buildEntryRow(entry, comp, athletes, results, onChanged) {
+// Appends two <tr> per start-list entry: the main row (lane/number/athlete/
+// event/seed time/quick result capture), and a companion, initially hidden
+// row holding an inline stopwatch panel with lap ("Runde") splits — toggled
+// via the ⏱ button. Recorded laps are documented alongside the result
+// (results.laps) once "Zeit übernehmen" is used and the row is saved, so a
+// captured time immediately shows up in Times & Statistics as before, now
+// optionally with its splits.
+function appendEntryRows(tbody, entry, comp, athletes, results, onChanged) {
   const athlete = athletes.find(a => a.id === entry.athleteId);
   const existingResult = findResultForEntry(results, entry);
+  let recordedLaps = existingResult?.laps ? [...existingResult.laps] : [];
 
   const timeInput = textInput(existingResult ? secToTime(existingResult.time) : '', { placeholder: 'mm:ss.cc', style: 'width:100px' });
   const saveBtn = el('button', { class: 'btn btn-accent btn-sm', title: t('competitions.quickSaveTitle'), onclick: async () => {
@@ -173,6 +177,7 @@ function buildEntryRow(entry, comp, athletes, results, onChanged) {
       ...(existingResult || {}), athleteId: entry.athleteId, event: entry.event, time: sec,
       date: comp.date, course: comp.course, competitionId: comp.id, isPB,
       place: existingResult?.place ?? null,
+      laps: recordedLaps.length > 0 ? recordedLaps : undefined,
     });
     toast(isPB ? t('competitions.resultSavedPB') : t('competitions.resultSaved'));
     onChanged();
@@ -188,20 +193,118 @@ function buildEntryRow(entry, comp, athletes, results, onChanged) {
     },
   });
 
-  return el('tr', {}, [
+  const detailRow = el('tr', { hidden: true });
+  const detailTd = el('td', { colspan: '8' });
+  detailRow.appendChild(detailTd);
+  buildStopwatchPanel(detailTd, {
+    initialLaps: recordedLaps,
+    onApply: (totalSeconds, laps) => {
+      timeInput.value = secToTime(totalSeconds);
+      recordedLaps = laps.slice();
+      toast(t('competitions.stopwatchApplied'));
+    },
+  });
+
+  const stopwatchBtn = el('button', {
+    type: 'button', class: 'btn btn-ghost btn-sm', title: t('competitions.stopwatchToggle'),
+    onclick: () => { detailRow.hidden = !detailRow.hidden; },
+  }, '⏱ ' + t('competitions.stopwatchToggle'));
+
+  const mainRow = el('tr', {}, [
     el('td', { class: 'data' }, entry.lane != null ? String(entry.lane) : '—'),
     el('td', { class: 'data' }, entry.eventNumber || '—'),
     el('td', {}, fullName(athlete)),
     el('td', {}, trCode(entry.event, 'events')),
     el('td', { class: 'data' }, entry.seedTime ? secToTime(entry.seedTime) : '—'),
-    el('td', {}, [timeInput, ' ', saveBtn, existingResult?.isPB ? ' ' : null, existingResult?.isPB ? badge('PB', 'pb') : null]),
+    el('td', {}, [timeInput, ' ', saveBtn, existingResult?.isPB ? ' ' : null, existingResult?.isPB ? badge('PB', 'pb') : null, recordedLaps.length > 0 ? ' ' : null, recordedLaps.length > 0 ? badge(t('competitions.stopwatchLapCount', { count: recordedLaps.length }), 'neutral') : null]),
     el('td', {}, placeInput),
     el('td', {}, [
+      stopwatchBtn, ' ',
       el('button', { class: 'btn btn-ghost btn-sm', onclick: () => openEntryModal(entry, comp, athletes, onChanged) }, t('common.edit')),
       ' ',
       el('button', { class: 'btn btn-danger btn-sm', onclick: () => confirmAction(t('competitions.entryDeleteConfirm'), async () => { await remove('entries', entry.id); toast(t('competitions.entryRemoved')); onChanged(); }) }, t('common.remove')),
     ]),
   ]);
+
+  tbody.appendChild(mainRow);
+  tbody.appendChild(detailRow);
+}
+
+// Self-contained stopwatch widget: Start / Runde (lap) / Stopp / Zurücksetzen,
+// live-updating elapsed-time display, and a table of recorded lap splits.
+// `initialLaps` (seconds, cumulative) lets a previously documented set of
+// splits be shown when the panel is reopened, without starting a new run.
+// `onApply(totalSeconds, laps)` is called when "Zeit übernehmen" is clicked.
+function buildStopwatchPanel(container, { initialLaps = [], onApply }) {
+  let running = false;
+  let startTs = null;
+  let laps = [...initialLaps];
+  let intervalId = null;
+
+  const display = el('div', { class: 'data', style: 'font-size:1.7rem;font-weight:700;margin-bottom:10px' }, secToTime(laps.length ? laps[laps.length - 1] : 0));
+  const lapsHost = el('div');
+
+  const startBtn = el('button', { type: 'button', class: 'btn btn-primary btn-sm' }, t('competitions.stopwatchStart'));
+  const lapBtn = el('button', { type: 'button', class: 'btn btn-ghost btn-sm', disabled: true }, t('competitions.stopwatchLap'));
+  const stopBtn = el('button', { type: 'button', class: 'btn btn-danger btn-sm', disabled: true }, t('competitions.stopwatchStop'));
+  const resetBtn = el('button', { type: 'button', class: 'btn btn-ghost btn-sm' }, t('competitions.stopwatchReset'));
+  const applyBtn = el('button', { type: 'button', class: 'btn btn-accent btn-sm', disabled: laps.length === 0 }, t('competitions.stopwatchApply'));
+
+  function currentElapsed() {
+    if (running) return (performance.now() - startTs) / 1000;
+    return laps.length ? laps[laps.length - 1] : 0;
+  }
+  function updateDisplay() { display.textContent = secToTime(currentElapsed()); }
+
+  function drawLaps() {
+    clear(lapsHost);
+    if (laps.length === 0) { lapsHost.appendChild(el('p', { class: 'hint' }, t('competitions.stopwatchNoLaps'))); return; }
+    const table = el('table');
+    table.appendChild(el('thead', {}, el('tr', {}, [
+      el('th', {}, t('competitions.stopwatchLapNr')), el('th', {}, t('competitions.stopwatchLapSplit')), el('th', {}, t('competitions.stopwatchLapTotal')),
+    ])));
+    const tbody = el('tbody');
+    laps.forEach((cum, i) => {
+      const prev = i === 0 ? 0 : laps[i - 1];
+      tbody.appendChild(el('tr', {}, [el('td', {}, String(i + 1)), el('td', { class: 'data' }, secToTime(cum - prev)), el('td', { class: 'data' }, secToTime(cum))]));
+    });
+    table.appendChild(tbody);
+    lapsHost.appendChild(el('div', { class: 'table-wrap' }, table));
+  }
+
+  startBtn.addEventListener('click', () => {
+    running = true; startTs = performance.now(); laps = [];
+    startBtn.disabled = true; lapBtn.disabled = false; stopBtn.disabled = false; applyBtn.disabled = true;
+    drawLaps(); updateDisplay();
+    intervalId = setInterval(updateDisplay, 30);
+  });
+  lapBtn.addEventListener('click', () => {
+    if (!running) return;
+    laps.push(currentElapsed());
+    drawLaps();
+  });
+  stopBtn.addEventListener('click', () => {
+    if (!running) return;
+    const final = currentElapsed();
+    if (laps.length === 0 || Math.abs(laps[laps.length - 1] - final) > 0.01) laps.push(final);
+    running = false;
+    clearInterval(intervalId);
+    startBtn.disabled = false; lapBtn.disabled = true; stopBtn.disabled = true; applyBtn.disabled = false;
+    updateDisplay(); drawLaps();
+  });
+  resetBtn.addEventListener('click', () => {
+    running = false; clearInterval(intervalId); laps = []; startTs = null;
+    startBtn.disabled = false; lapBtn.disabled = true; stopBtn.disabled = true; applyBtn.disabled = true;
+    updateDisplay(); drawLaps();
+  });
+  applyBtn.addEventListener('click', () => { onApply(currentElapsed(), laps); });
+
+  container.appendChild(el('div', { style: 'padding:12px 4px' }, [
+    display,
+    el('div', { class: 'flex gap-8 mb-8', style: 'flex-wrap:wrap' }, [startBtn, lapBtn, stopBtn, resetBtn, applyBtn]),
+    lapsHost,
+  ]));
+  drawLaps();
 }
 
 function openCompModal(comp, onSaved) {
