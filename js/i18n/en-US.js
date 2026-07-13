@@ -114,6 +114,12 @@ export default {
     placeNeedsTimeFirst: 'Please record a result time first.',
     entryDeleteConfirm: 'Remove this start-list entry? (Already recorded result times are kept.)',
     entryRemoved: 'Entry removed', placeHeader: 'Placement',
+    stopwatchToggle: 'Stopwatch', stopwatchStart: 'Start', stopwatchLap: 'Lap',
+    stopwatchStop: 'Stop', stopwatchReset: 'Reset', stopwatchApply: 'Apply time',
+    stopwatchNoLaps: 'No lap times yet.', stopwatchLapNr: 'Lap',
+    stopwatchLapSplit: 'Split', stopwatchLapTotal: 'Total time',
+    stopwatchApplied: 'Time applied from stopwatch — remember to click "Save".',
+    stopwatchLapCount: '{count} lap times',
   },
   times: {
     eyebrow: '{count} times recorded', title: 'Times & Performance', addTime: '+ Record time',
