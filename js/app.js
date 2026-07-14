@@ -20,9 +20,10 @@ import { actionItemsModule } from './modules/actionItems.js';
 import { statsModule } from './modules/stats.js';
 import { syncQueueModule } from './modules/syncQueue.js';
 import { profileModule } from './modules/profile.js';
+import { userManagementModule } from './modules/userManagement.js';
 
 [dashboardModule, athletesModule, competitionsModule, timesModule, plansModule,
-  templatesModule, catalogModule, sessionsModule, actionItemsModule, statsModule, syncQueueModule, profileModule]
+  templatesModule, catalogModule, sessionsModule, actionItemsModule, statsModule, syncQueueModule, profileModule, userManagementModule]
   .forEach(registerModule);
 
 const viewEl = document.getElementById('view');
