@@ -78,6 +78,8 @@ export async function updateProfile(patch) {
 }
 
 export function isTrainerOrAdmin() {
-  return ['trainer', 'admin'].includes(getRole());
+  return ['trainer', 'admin', 'superadmin'].includes(getRole());
 }
 export function isAdmin() { return getRole() === 'admin'; }
+export function isSuperAdmin() { return getRole() === 'superadmin'; }
+export function isAdminOrSuperAdmin() { return ['admin', 'superadmin'].includes(getRole()); }
