@@ -7,7 +7,8 @@ const DB_VERSION = 1;
 
 export const STORES = [
   'users', 'athletes', 'groups', 'competitions', 'entries', 'results',
-  'exercises', 'templates', 'plans', 'sessions', 'actionItems', 'meta', 'syncQueue'
+  'exercises', 'templates', 'plans', 'sessions', 'actionItems', 'meta', 'syncQueue',
+  'clubs', 'invitations'
 ];
 
 let dbPromise = null;
