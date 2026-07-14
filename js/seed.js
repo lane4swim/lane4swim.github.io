@@ -35,10 +35,32 @@ async function seedDemoData() {
   ].map(a => ({ id: id(), ...a }));
   await bulkPut('athletes', athletes);
 
-  const trainerUser = { id: id(), name: 'Sabine Reuter', role: 'trainer', athleteId: null, email: 'sabine.reuter@example.org', locale: 'de-DE' };
-  const adminUser = { id: id(), name: 'Team-Administrator', role: 'admin', athleteId: null, email: 'admin@example.org', locale: 'de-DE' };
-  const athleteUser = { id: id(), name: athletes[0].firstName + ' ' + athletes[0].lastName, role: 'athlete', athleteId: athletes[0].id, email: 'mara.vogel@example.org', locale: 'en-US' };
-  await bulkPut('users', [trainerUser, adminUser, athleteUser]);
+  const demoClub = { id: id(), name: 'Demo Schwimmverein e.V.', createdAt: todayISO(), updatedAt: todayISO() };
+  await bulkPut('clubs', [demoClub]);
+
+  const superAdminUser = { id: id(), name: 'System-Superadmin', role: 'superadmin', athleteId: null, clubId: null, email: 'superadmin@example.org', locale: 'de-DE' };
+  const trainerUser = { id: id(), name: 'Sabine Reuter', role: 'trainer', athleteId: null, clubId: demoClub.id, email: 'sabine.reuter@example.org', locale: 'de-DE' };
+  const adminUser = { id: id(), name: 'Team-Administrator', role: 'admin', athleteId: null, clubId: demoClub.id, email: 'admin@example.org', locale: 'de-DE' };
+  const athleteUser = { id: id(), name: athletes[0].firstName + ' ' + athletes[0].lastName, role: 'athlete', athleteId: athletes[0].id, clubId: demoClub.id, email: 'mara.vogel@example.org', locale: 'en-US' };
+  await bulkPut('users', [superAdminUser, trainerUser, adminUser, athleteUser]);
+
+  // Demo-Einladung: zeigt im neuen Userverwaltung-Modul sofort, wie eine
+  // ausstehende Einladung (hier: ein neuer Trainer fürs Demo-Team) aussieht.
+  const pendingInvitation = {
+    id: id(),
+    token: 'demo-' + id(),
+    role: 'trainer',
+    clubId: demoClub.id,
+    clubName: demoClub.name,
+    email: 'neuer.trainer@example.org',
+    athleteId: null,
+    invitedByUserId: adminUser.id,
+    expiresAt: isoAddDays(todayISO(), 7) + 'T00:00:00.000Z',
+    usedAt: null,
+    revokedAt: null,
+    createdAt: todayISO() + 'T00:00:00.000Z',
+  };
+  await bulkPut('invitations', [pendingInvitation]);
 
   const comp1 = { id: id(), name: 'Bezirksmeisterschaften Kurzbahn', date: isoAddDays(todayISO(), 21), location: 'Hallenbad Nord', course: 'SCM', notes: 'Meldeschluss 10 Tage vorher' };
   const comp2 = { id: id(), name: 'Vereinsvergleich Frühjahr', date: isoAddDays(todayISO(), -18), location: 'Freibad Ost', course: 'LCM', notes: '' };
