@@ -3,7 +3,7 @@
 // modules can add a store name and get get/getAll/put/remove for free.
 
 const DB_NAME = 'lane1-db';
-const DB_VERSION = 1;
+const DB_VERSION = 2; // v2: 'clubs' + 'invitations' Stores ergänzt (Nutzerverwaltung)
 
 export const STORES = [
   'users', 'athletes', 'groups', 'competitions', 'entries', 'results',
