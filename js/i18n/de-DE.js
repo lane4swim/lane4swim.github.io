@@ -78,6 +78,7 @@ export default {
     formNotes: 'Notizen', formStatus: 'Status', formActiveLabel: 'aktiv',
     modalEditTitle: '{name} bearbeiten', modalCreateTitle: 'Athlet:in anlegen',
     validationName: 'Bitte Vor- und Nachname angeben.', savedEdit: 'Änderungen gespeichert', savedCreate: 'Athlet:in angelegt',
+    rosterManagedByAdmin: 'Athletenprofile werden von Administrator:innen angelegt und verwaltet. Bitte wählen Sie aus den bestehenden Profilen.',
     groupsModalTitle: 'Trainingsgruppen verwalten', noGroupsYet: 'Noch keine Gruppen angelegt.',
     groupNamePlaceholder: 'z. B. Leistungsgruppe', groupDescPlaceholder: 'Kurzbeschreibung (optional)',
     addGroupButton: '+ Gruppe hinzufügen',
