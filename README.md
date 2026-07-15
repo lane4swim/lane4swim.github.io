@@ -7,17 +7,19 @@ Laden keine Internetverbindung mehr.
 
 ## Funktionsumfang
 
-- **Athleten- & Teammanagement** — Profile, Trainingsgruppen
-- **Wettkampfmanagement** — Wettkämpfe, Startlisten (Wettkampfnummer, Lauf, Startbahn) und Ergebniserfassung
+- **Athleten- & Teammanagement** — Profile, Trainingsgruppen. Athletenprofile (Name/Identität) werden ausschließlich von Admins/Superadmins angelegt, geändert und gelöscht; Trainer:innen sehen den Bestand und arbeiten damit (Zeiten, Pläne, Einheiten, Handlungsfelder), können aber keine neuen Athlet:innen per Namenseingabe hinzufügen oder bestehende umbenennen/entfernen
+- **Wettkampfmanagement** — Wettkämpfe, Startlisten (Wettkampfnummer, Lauf, Startbahn) mit integrierter Stoppuhr (inkl. Rundenzeiten) zur direkten Zeitmessung, und Ergebniserfassung
 - **Zeiten- & Leistungserfassung** — Bestzeiten, Verlaufsdiagramme
 - **Trainingspläne** — Wochenkalender mit Sets/Serien **und Wiederholungsblöcken** (z. B. „3× [2×25 Sprint, 50 locker]“), aus Vorlagen erstellbar
 - **Wiederverwendbare Vorlagen** für Trainingspläne
-- **Übungskatalog** — durchsuchbare, taggable Übungsbibliothek
+- **Übungskatalog** — durchsuchbare, taggable Übungsbibliothek inkl. benötigter Ausrüstung, direkt im Trainingsplan-Editor sichtbar und dort auch bearbeitbar (ohne den Übungskatalog verlassen zu müssen)
 - **Einheiten-Tracking & Feedback** — Anwesenheit, RPE, Notizen
 - **Handlungsfelder** — dokumentierte Entwicklungsziele je Athlet:in mit Status
 - **Statistiken & Auswertungen** — Anwesenheitsquote, RPE-Trend, Leistungsentwicklung
 - **Sync-Warteschlange** — Event-Queue (Outbox-Pattern) zur Vorbereitung einer künftigen Backend-Synchronisation, inkl. simulierter Übertragung in der Demo
 - **Mehrsprachigkeit** — Deutsch (de-DE) und Englisch (en-US) von Anfang an, Sprachumschalter in der Kopfzeile, pro Nutzer:in gespeichert, leicht um weitere Sprachen erweiterbar
+- **Mein Profil** — jede:r Nutzer:in kann eigene Kontodaten (Name, E-Mail) sowie die bevorzugte Sprache selbst verwalten
+- **Nutzerverwaltung** — Superadministrator:innen legen Vereine an und laden deren ersten Admin per zeitlich befristetem Einladungslink ein; Admins laden Trainer:innen/Athlet:innen ihres Vereins ebenso ein (aktuell als lokale Simulation, echte Backend-Anbindung folgt in Phase 4). Hinweis für bereits laufende Installationen: `js/db.js` wurde auf `DB_VERSION = 2` angehoben, damit die dafür neu benötigten IndexedDB-Stores (`clubs`, `invitations`) bei bestehenden Datenbanken automatisch nachträglich angelegt werden.
 
 Drei Rollen: **Trainer**, **Athlet** und **Administrator** (siehe unten).
 
@@ -54,8 +56,9 @@ werden:
 
 | Konto | Rolle | Sichtbare Bereiche | Sprache |
 |---|---|---|---|
+| System-Superadmin | Superadministrator:in | Nutzerverwaltung (Vereine anlegen, Admin-Einladungen) | de-DE |
 | Sabine Reuter | Trainer:in | Alle Bereiche außer reinen Athleten-Ansichten | de-DE |
-| Team-Administrator | Administrator | Alle Bereiche | de-DE |
+| Team-Administrator | Administrator | Alle Bereiche inkl. Nutzerverwaltung (Team einladen) | de-DE |
 | Mara Vogel | Athlet:in | Dashboard, Zeiten, Trainingspläne, Einheiten, eigene Handlungsfelder | en-US |
 
 Die Spalte „Sprache" zeigt bewusst unterschiedliche Werte: Mara Vogels
@@ -154,7 +157,13 @@ wechselt die Sprache automatisch mit; ändert man die Sprache über das
 Dropdown, wird sie im aktuell aktiven Nutzer-Datensatz gespeichert
 (`state.js: setUserLocale()`). Ohne bekannten Nutzer (z. B. ganz
 erster Start) wird zunächst die Browsersprache erkannt, sonst auf
-Deutsch zurückgefallen (`i18n.js: detectInitialLocale()`).
+Deutsch zurückgefallen (`i18n.js: detectInitialLocale()`). Ein
+Sprachwechsel löst dabei genau **einen** Re-Render aus (`setUserLocale()`
+benachrichtigt nur die Sprach-Listener, nicht zusätzlich die
+Konto-Listener) — jedes Fachmodul sichert seinen Render zusätzlich per
+`beginRender()`/`isCurrent()` ab (`js/utils.js`), damit überlappende
+Render-Aufrufe (gleich aus welchem Grund) nie zu doppelt angezeigtem
+Inhalt führen können.
 
 **Architektur:**
 - **`js/i18n/de-DE.js`**, **`js/i18n/en-US.js`** — je ein flaches,
