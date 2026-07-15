@@ -78,6 +78,7 @@ export default {
     formNotes: 'Notes', formStatus: 'Status', formActiveLabel: 'active',
     modalEditTitle: 'Edit {name}', modalCreateTitle: 'Add athlete',
     validationName: 'Please enter a first and last name.', savedEdit: 'Changes saved', savedCreate: 'Athlete added',
+    rosterManagedByAdmin: 'Athlete profiles are created and managed by administrators. Please choose from the existing profiles.',
     groupsModalTitle: 'Manage training groups', noGroupsYet: 'No groups created yet.',
     groupNamePlaceholder: 'e.g. Elite squad', groupDescPlaceholder: 'Short description (optional)',
     addGroupButton: '+ Add group',
