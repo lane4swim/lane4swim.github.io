@@ -7,7 +7,7 @@ import {
   field, textInput, selectInput, openModal, confirmAction, toast, badge,
   emptyState, laneWave, groupBy, secToTime,
 } from '../utils.js';
-import { getRole } from '../state.js';
+import { getRole, isAdminOrSuperAdmin } from '../state.js';
 import { navigate } from '../router.js';
 import { t, trCode } from '../i18n.js';
 import { beginRender } from '../utils.js';
@@ -32,8 +32,8 @@ function renderList(container, athletes, groups) {
     el('div', {}, [el('div', { class: 'page-eyebrow' }, t('athletes.eyebrow', { count: athletes.length })), el('h1', { class: 'mt-0' }, t('athletes.title'))]),
     el('div', { class: 'page-actions' }, [
       el('button', { class: 'btn btn-ghost', onclick: () => openGroupModal(groups, refresh) }, t('athletes.manageGroups')),
-      el('button', { class: 'btn btn-primary', onclick: () => openAthleteModal(null, groups, refresh) }, t('athletes.addAthlete')),
-    ]),
+      isAdminOrSuperAdmin() ? el('button', { class: 'btn btn-primary', onclick: () => openAthleteModal(null, groups, refresh) }, t('athletes.addAthlete')) : null,
+    ].filter(Boolean)),
   ]));
   wrap.appendChild(laneWave());
 
@@ -112,10 +112,10 @@ async function renderDetail(container, athleteId, athletes, groups) {
       el('div', { class: 'page-eyebrow' }, group?.name || t('athletes.noGroup')),
       el('h1', { class: 'mt-0' }, fullName(athlete)),
     ]),
-    el('div', { class: 'page-actions' }, [
+    el('div', { class: 'page-actions' }, isAdminOrSuperAdmin() ? [
       el('button', { class: 'btn btn-ghost', onclick: () => openAthleteModal(athlete, groups, () => navigate('athletes', athleteId) & location.reload()) }, t('common.edit')),
       el('button', { class: 'btn btn-danger', onclick: () => confirmAction(t('athletes.deleteConfirm', { name: fullName(athlete) }), async () => { await remove('athletes', athleteId); toast(t('athletes.deleted')); navigate('athletes'); }) }, t('common.delete')),
-    ]),
+    ] : []),
   ]));
   wrap.appendChild(laneWave());
 
@@ -162,6 +162,14 @@ async function renderDetail(container, athleteId, athletes, groups) {
 }
 
 function openAthleteModal(athlete, groups, onSaved) {
+  // Verteidigung in der Tiefe: neben dem Ausblenden der Buttons in
+  // renderList()/renderDetail() wird hier zusätzlich geprüft — Trainer:innen
+  // dürfen den Athleten-Stamm (Name/Identität) nicht anlegen oder ändern,
+  // sondern nur die von Admin/Superadmin angelegten Profile einsehen/nutzen.
+  if (!isAdminOrSuperAdmin()) {
+    toast(t('athletes.rosterManagedByAdmin'), 'error');
+    return;
+  }
   const isEdit = !!athlete;
   const data = athlete ? { ...athlete } : { firstName: '', lastName: '', birthdate: '', gender: 'w', groupId: groups[0]?.id || '', joinDate: todayISO(), active: true, notes: '' };
   const form = el('form', { class: 'form-grid' });
