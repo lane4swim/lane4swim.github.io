@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Logistics — Phase 1</title>
+<style>
+  :root{
+    --bg:#0b1420;
+    --bg-panel:#101d2b;
+    --grid-line:#1c3346;
+    --road:#4a5568;
+    --road-edge:#6b7a8d;
+    --teal:#2ea6a1;
+    --amber:#e0a840;
+    --amber-dim:#8a6a2e;
+    --danger:#c0524a;
+    --text:#d7e2ea;
+    --text-dim:#7f95a6;
+    --mono: 'Consolas', 'SF Mono', 'Menlo', monospace;
+    --sans: -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:var(--sans);}
+  #app{display:flex;height:100%;}
+
+  /* ---------- left toolbar ---------- */
+  #toolbar{
+    width:200px; flex:0 0 200px; background:var(--bg-panel);
+    border-right:1px solid var(--grid-line); padding:14px 12px; overflow-y:auto;
+  }
+  #toolbar h1{
+    font-size:13px; letter-spacing:.12em; text-transform:uppercase;
+    color:var(--amber); margin:0 0 4px; font-weight:700;
+  }
+  #toolbar .sub{font-size:11px;color:var(--text-dim);margin-bottom:16px;}
+  .tool-btn{
+    display:flex; align-items:center; gap:8px; width:100%; text-align:left;
+    background:transparent; border:1px solid transparent; color:var(--text);
+    padding:8px 10px; margin-bottom:4px; border-radius:4px; cursor:pointer;
+    font-size:13px; font-family:var(--sans);
+  }
+  .tool-btn:hover{background:rgba(255,255,255,.04);}
+  .tool-btn.active{background:rgba(46,166,161,.15); border-color:var(--teal); color:#eafffb;}
+  .tool-btn .cost{margin-left:auto; font-family:var(--mono); font-size:11px; color:var(--text-dim);}
+  .tool-swatch{width:10px;height:10px;border-radius:2px;flex:0 0 auto;}
+  .section-label{
+    font-size:10px; text-transform:uppercase; letter-spacing:.1em;
+    color:var(--text-dim); margin:16px 0 6px;
+  }
+  select#tierSelect{
+    width:100%; background:var(--bg); color:var(--text); border:1px solid var(--grid-line);
+    padding:6px; border-radius:4px; font-size:12px; margin-bottom:4px;
+  }
+  #tierHint{font-size:10px;color:var(--text-dim);margin-bottom:8px;}
+
+  /* ---------- center stage ---------- */
+  #stage{flex:1; display:flex; flex-direction:column; min-width:0;}
+  #hud{
+    height:44px; flex:0 0 44px; background:var(--bg-panel);
+    border-bottom:1px solid var(--grid-line); display:flex; align-items:center;
+    padding:0 16px; gap:24px;
+  }
+  #treasury{font-family:var(--mono); font-size:18px; color:var(--amber); font-weight:700;}
+  #treasury.negative{color:var(--danger);}
+  #tickInfo{font-family:var(--mono); font-size:11px; color:var(--text-dim);}
+  #hint{font-size:12px;color:var(--text-dim); margin-left:auto;}
+  #canvasWrap{flex:1; overflow:auto; background:var(--bg); display:flex; align-items:center; justify-content:center;}
+  canvas{background:#0d1926; image-rendering:pixelated; cursor:crosshair;}
+
+  /* ---------- right panel ---------- */
+  #sidepanel{
+    width:260px; flex:0 0 260px; background:var(--bg-panel);
+    border-left:1px solid var(--grid-line); padding:14px 12px; overflow-y:auto;
+  }
+  #sidepanel h2{font-size:12px; text-transform:uppercase; letter-spacing:.1em; color:var(--teal); margin:0 0 10px;}
+  #selectionInfo{font-size:12px; line-height:1.6; color:var(--text-dim);}
+  #selectionInfo b{color:var(--text);}
+  .order-row{
+    display:flex; align-items:center; gap:6px; background:var(--bg);
+    border:1px solid var(--grid-line); border-radius:4px; padding:6px 8px; margin-bottom:5px; font-size:12px;
+  }
+  .order-row .idx{color:var(--text-dim); font-family:var(--mono); width:14px;}
+  .order-row .act{color:var(--amber); font-family:var(--mono); font-size:11px;}
+  .order-row .rm{margin-left:auto; cursor:pointer; color:var(--danger); font-weight:700;}
+  .btn{
+    background:var(--teal); color:#032523; border:none; border-radius:4px;
+    padding:7px 10px; font-size:12px; cursor:pointer; font-weight:600; width:100%;
+    margin-top:6px;
+  }
+  .btn.secondary{background:transparent; border:1px solid var(--road-edge); color:var(--text);}
+  .btn.danger{background:var(--danger); color:#2a0d0a;}
+  .fill-bar{height:6px;border-radius:3px;background:var(--grid-line);overflow:hidden;margin:4px 0 8px;}
+  .fill-bar > div{height:100%; background:var(--teal);}
+
+  #log{
+    position:fixed; left:212px; bottom:0; right:270px; max-height:120px; overflow-y:auto;
+    background:rgba(9,16,24,.92); border-top:1px solid var(--grid-line); font-family:var(--mono);
+    font-size:11px; padding:6px 10px; pointer-events:none;
+  }
+  #log div{color:var(--text-dim); padding:1px 0;}
+  #log div.money{color:var(--amber);}
+  #log div.warn{color:var(--danger);}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div id="toolbar">
+    <h1>Logistics</h1>
+    <div class="sub">Phase 1 — ground roads &amp; trucks</div>
+
+    <div class="section-label">Tools</div>
+    <button class="tool-btn active" data-tool="select"><span class="tool-swatch" style="background:var(--road-edge)"></span>Select / Inspect</button>
+    <button class="tool-btn" data-tool="road"><span class="tool-swatch" style="background:var(--road)"></span>Build Road<span class="cost">$10/tile</span></button>
+    <button class="tool-btn" data-tool="mine"><span class="tool-swatch" style="background:#7a5230"></span>Build Mine<span class="cost" id="mineCost">$150</span></button>
+    <button class="tool-btn" data-tool="town"><span class="tool-swatch" style="background:#3a6ea5"></span>Build Town<span class="cost" id="townCost">$100</span></button>
+    <button class="tool-btn" data-tool="demolish"><span class="tool-swatch" style="background:var(--danger)"></span>Demolish</button>
+    <button class="tool-btn" data-tool="truck"><span class="tool-swatch" style="background:var(--amber)"></span>Buy Truck<span class="cost">$200</span></button>
+
+    <div class="section-label">Storage tier (Mine/Town)</div>
+    <select id="tierSelect">
+      <option value="small">Small — +$0, cap 20</option>
+      <option value="large">Large — +$100, cap 50</option>
+    </select>
+    <div id="tierHint">Applies to the next Mine or Town you place. Buildings can't be resized later in Phase 1.</div>
+
+    <div class="section-label">About</div>
+    <div id="tierHint">
+      Roads auto-connect to adjacent road tiles. Mines and Towns must be placed
+      next to a road. Trucks only go where you send them — set their orders
+      in the panel on the right.
+    </div>
+  </div>
+
+  <div id="stage">
+    <div id="hud">
+      <div id="treasury">$0</div>
+      <div id="tickInfo">tick 0</div>
+      <div id="hint">Click a tool, then click the grid.</div>
+    </div>
+    <div id="canvasWrap">
+      <canvas id="c" width="880" height="560"></canvas>
+    </div>
+  </div>
+
+  <div id="sidepanel">
+    <h2>Inspector</h2>
+    <div id="selectionInfo">Nothing selected. Click a building or a truck.</div>
+  </div>
+
+</div>
+<div id="log"></div>
+
+<script>
+/* =====================================================================
+   PHASE 1 PROTOTYPE
+   Implements, on the main thread for now (see README for the Worker
+   split noted in the architecture spec §2/§8 as a fast-follow):
+     - single ground layer, road network + trucks (§6.2)
+     - ECS-ish entities: buildings (Producer/Consumer/Storage), vehicles
+     - fixed-timestep simulation loop decoupled from rendering (§8)
+     - player-authored Orders lists — no auto-routing (§6.6)
+     - player-chosen storage capacity at build time (§6.6)
+     - backpressure: halted production / waiting vehicles (§6.6)
+     - Treasury, construction costs, vehicle purchase+running cost,
+       delivery income (§16)
+   ===================================================================== */
+
+// ---------------------------------------------------------------------
+// DATA DEFINITIONS  (stand-in for /data/*.json content packs, §9 / §16)
+// ---------------------------------------------------------------------
+const RESOURCE = { id:'ore', name:'Ore', baseValue:6 };
+const RECIPE_DURATION_TICKS = 4;   // mine produces 1 ore every N ticks
+const ROAD_COST_PER_TILE = 10;
+const TRANSFER_RATE = 4;           // units moved per tick during load/unload
+const TICK_MS = 300;               // fixed simulation timestep
+
+const BUILDING_DEFS = {
+  mine: { buildCost: 150, tiers: { small:{cap:20, add:0}, large:{cap:50, add:100} }, color:'#7a5230', label:'Mine' },
+  town: { buildCost: 100, tiers: { small:{cap:20, add:0}, large:{cap:50, add:80}  }, color:'#3a6ea5', label:'Town' },
+};
+const VEHICLE_DEFS = {
+  truck: { purchaseCost:200, runningCostPerTick:1, capacity:10, sellFraction:0.4, label:'Truck' },
+};
+
+// ---------------------------------------------------------------------
+// WORLD STATE
+// ---------------------------------------------------------------------
+const GRID_W = 22, GRID_H = 14, CELL = 40;
+const world = {
+  treasury: 1000,
+  tick: 0,
+  grid: new Map(),          // "x,y" -> { road:false, buildingId:null }
+  entities: new Map(),      // id -> entity
+  nextId: 1,
+};
+
+function cellKey(x,y){ return x+','+y; }
+function getCell(x,y){
+  const k = cellKey(x,y);
+  if(!world.grid.has(k)) world.grid.set(k,{road:false, buildingId:null});
+  return world.grid.get(k);
+}
+function inBounds(x,y){ return x>=0 && y>=0 && x<GRID_W && y<GRID_H; }
+
+// ---------------------------------------------------------------------
+// EVENTS / LOG  (stand-in for the Event stream in §7/§16)
+// ---------------------------------------------------------------------
+const logEl = document.getElementById('log');
+function logEvent(msg, cls){
+  const d = document.createElement('div');
+  if(cls) d.className = cls;
+  d.textContent = msg;
+  logEl.appendChild(d);
+  while(logEl.children.length > 40) logEl.removeChild(logEl.firstChild);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+// ---------------------------------------------------------------------
+// ECONOMY  (§16 — EconomySystem: the only thing that touches Treasury)
+// ---------------------------------------------------------------------
+function canAfford(cost){ return world.treasury >= cost; }
+function charge(cost, reason){
+  world.treasury -= cost;
+  logEvent(`-$${cost} ${reason}`, 'money');
+}
+function credit(amount, reason){
+  world.treasury += amount;
+  logEvent(`+$${amount} ${reason}`, 'money');
+}
+
+// ---------------------------------------------------------------------
+// ROAD NETWORK + PATHFINDING (§6.2, §10 — BFS since edges are uniform cost)
+// ---------------------------------------------------------------------
+function neighbors4(x,y){
+  return [[x+1,y],[x-1,y],[x,y+1],[x,y-1]].filter(([nx,ny])=>inBounds(nx,ny));
+}
+function isRoad(x,y){ return getCell(x,y).road; }
+
+// Find a road-adjacent cell for a building (its "dock").
+function roadAccessCell(bx,by){
+  for(const [nx,ny] of neighbors4(bx,by)) if(isRoad(nx,ny)) return {x:nx,y:ny};
+  return null;
+}
+
+// BFS over road cells between two road-adjacent docks. Returns array of
+// {x,y} road cells from start to end (inclusive), or null if unreachable.
+function findRoadPath(start, end){
+  if(start.x===end.x && start.y===end.y) return [start];
+  const key = p => p.x+','+p.y;
+  const visited = new Set([key(start)]);
+  const queue = [start];
+  const cameFrom = new Map();
+  while(queue.length){
+    const cur = queue.shift();
+    for(const [nx,ny] of neighbors4(cur.x,cur.y)){
+      if(!isRoad(nx,ny)) continue;
+      const k = nx+','+ny;
+      if(visited.has(k)) continue;
+      visited.add(k);
+      cameFrom.set(k, cur);
+      if(nx===end.x && ny===end.y){
+        // reconstruct
+        let path = [{x:nx,y:ny}];
+        let c = cur;
+        while(c){ path.unshift(c); c = cameFrom.get(key(c)); }
+        return path;
+      }
+      queue.push({x:nx,y:ny});
+    }
+  }
+  return null;
+}
+
+// Full path for a vehicle: its current cell -> road dock -> ... -> target
+// building's road dock -> target building cell.
+function computeVehiclePath(vehicle, targetBuilding){
+  const fromDock = isRoad(vehicle.x, vehicle.y) ? {x:vehicle.x,y:vehicle.y} : roadAccessCell(vehicle.x, vehicle.y);
+  const toDock = roadAccessCell(targetBuilding.x, targetBuilding.y);
+  if(!fromDock || !toDock) return null;
+  const roadPath = findRoadPath(fromDock, toDock);
+  if(!roadPath) return null;
+  const full = [];
+  if(vehicle.x!==fromDock.x || vehicle.y!==fromDock.y) full.push({x:vehicle.x,y:vehicle.y});
+  full.push(...roadPath);
+  full.push({x:targetBuilding.x, y:targetBuilding.y});
+  return full;
+}
+
+// ---------------------------------------------------------------------
+// ENTITY FACTORIES
+// ---------------------------------------------------------------------
+function createBuilding(type, x, y, tier){
+  const def = BUILDING_DEFS[type];
+  const id = world.nextId++;
+  const entity = {
+    id, kind:'building', type, x, y,
+    storageCap: def.tiers[tier].cap,
+    stock: 0,               // single-resource Phase 1: always 'ore'
+    ticksRemaining: type==='mine' ? RECIPE_DURATION_TICKS : null,
+    producer: type==='mine',
+    consumer: type==='town',
+    priceMultiplier: 1.0,
+  };
+  world.entities.set(id, entity);
+  getCell(x,y).buildingId = id;
+  return entity;
+}
+function createVehicle(x,y){
+  const def = VEHICLE_DEFS.truck;
+  const id = world.nextId++;
+  const entity = {
+    id, kind:'vehicle', type:'truck', x, y,
+    cargoAmount:0, capacity:def.capacity,
+    orders:[],           // [{nodeId, action}] — player authored, §6.6
+    ordersIndex:0,
+    state:'idle',        // idle|moving|loading|unloading|blocked
+    path:null, pathIndex:0,
+    moveTimer:0,         // ticks between cell-steps (1 = one cell/tick)
+  };
+  world.entities.set(id, entity);
+  return entity;
+}
+
+// ---------------------------------------------------------------------
+// COMMANDS  (§7 — the only way the world is mutated by the player)
+// ---------------------------------------------------------------------
+function cmdBuildRoad(x,y){
+  const cell = getCell(x,y);
+  if(cell.road || cell.buildingId){ return; }
+  if(!canAfford(ROAD_COST_PER_TILE)){ logEvent('Insufficient funds for road.', 'warn'); return; }
+  charge(ROAD_COST_PER_TILE, 'road tile');
+  cell.road = true;
+}
+function cmdBuildBuilding(type, x, y, tier){
+  const cell = getCell(x,y);
+  if(cell.road || cell.buildingId){ logEvent('Cell occupied.', 'warn'); return; }
+  const hasRoadNeighbor = neighbors4(x,y).some(([nx,ny])=>isRoad(nx,ny));
+  if(!hasRoadNeighbor){ logEvent(`${BUILDING_DEFS[type].label} must be built next to a road.`, 'warn'); return; }
+  const def = BUILDING_DEFS[type];
+  const cost = def.buildCost + def.tiers[tier].add;
+  if(!canAfford(cost)){ logEvent('Insufficient funds for construction.', 'warn'); return; }
+  charge(cost, `${def.label} (${tier})`);
+  createBuilding(type, x, y, tier);
+}
+function cmdDemolish(x,y){
+  const cell = getCell(x,y);
+  if(cell.buildingId){
+    world.entities.delete(cell.buildingId);
+    cell.buildingId = null;
+  } else if(cell.road){
+    cell.road = false;
+  }
+}
+function cmdPurchaseVehicle(x,y){
+  const cell = getCell(x,y);
+  if(!cell.road){ logEvent('Trucks must be placed on a road tile.', 'warn'); return; }
+  const def = VEHICLE_DEFS.truck;
+  if(!canAfford(def.purchaseCost)){ logEvent('Insufficient funds for truck.', 'warn'); return; }
+  charge(def.purchaseCost, 'truck purchase');
+  createVehicle(x,y);
+}
+function cmdSellVehicle(vehicle){
+  const def = VEHICLE_DEFS.truck;
+  const refund = Math.round(def.purchaseCost * def.sellFraction);
+  credit(refund, 'truck sold');
+  world.entities.delete(vehicle.id);
+}
+function cmdSetOrders(vehicle, orders){
+  vehicle.orders = orders;
+  vehicle.ordersIndex = Math.min(vehicle.ordersIndex, Math.max(0, orders.length-1));
+  vehicle.path = null; // force a fresh path toward the (possibly new) target
+}
+
+// ---------------------------------------------------------------------
+// SIMULATION SYSTEMS — run once per fixed tick (§5, §8)
+// ---------------------------------------------------------------------
+function tickProduction(){
+  for(const e of world.entities.values()){
+    if(e.kind!=='building' || !e.producer) continue;
+    if(e.stock + 1 > e.storageCap){ continue; } // halted: no room (§6.6)
+    e.ticksRemaining--;
+    if(e.ticksRemaining <= 0){
+      e.stock += 1;
+      e.ticksRemaining = RECIPE_DURATION_TICKS;
+    }
+  }
+}
+
+function startMovingTo(vehicle, building){
+  const path = computeVehiclePath(vehicle, building);
+  if(!path){ vehicle.state='blocked'; return false; }
+  vehicle.path = path;
+  vehicle.pathIndex = 0;
+  vehicle.state = 'moving';
+  return true;
+}
+
+function currentOrder(vehicle){
+  if(!vehicle.orders.length) return null;
+  return vehicle.orders[vehicle.ordersIndex % vehicle.orders.length];
+}
+function advanceOrder(vehicle){
+  if(!vehicle.orders.length) return;
+  vehicle.ordersIndex = (vehicle.ordersIndex + 1) % vehicle.orders.length;
+}
+
+function tickVehicles(){
+  for(const v of world.entities.values()){
+    if(v.kind!=='vehicle') continue;
+
+    const order = currentOrder(v);
+    if(!order){ v.state='idle'; v.path=null; continue; }
+    const target = world.entities.get(order.nodeId);
+    if(!target){ advanceOrder(v); v.path=null; continue; } // stop was demolished
+
+    if(v.state==='idle' || v.state==='blocked'){
+      // (Re)try to reach, or act on, the current order's target. 'blocked'
+      // retries every tick until the resource/space it's waiting on frees up.
+      if(v.x===target.x && v.y===target.y){
+        v.state = order.action==='load_full' ? 'loading' : 'unloading';
+      } else {
+        startMovingTo(v, target); // -> 'moving', or 'blocked' if unreachable
+      }
+      continue;
+    }
+
+    if(v.state==='moving'){
+      if(!v.path){ startMovingTo(v, target); continue; }
+      const finalCell = v.path[v.path.length-1];
+      if(v.x===finalCell.x && v.y===finalCell.y){
+        v.state = order.action==='load_full' ? 'loading' : 'unloading';
+        v.path = null;
+        continue;
+      }
+      v.pathIndex++;
+      const next = v.path[v.pathIndex];
+      if(next){ v.x = next.x; v.y = next.y; }
+      continue;
+    }
+
+    if(v.state==='loading'){
+      // Mine -> truck (§6.6 LoadUnloadSystem)
+      if(target.stock <= 0){ v.state='blocked'; continue; } // wait: source empty
+      const room = v.capacity - v.cargoAmount;
+      if(room <= 0){ advanceOrder(v); v.state='idle'; continue; } // full, move on
+      const amt = Math.min(TRANSFER_RATE, target.stock, room);
+      target.stock -= amt;
+      v.cargoAmount += amt;
+      if(v.cargoAmount >= v.capacity){ advanceOrder(v); v.state='idle'; }
+      continue;
+    }
+
+    if(v.state==='unloading'){
+      if(v.cargoAmount<=0){ advanceOrder(v); v.state='idle'; continue; }
+      const room = target.storageCap - target.stock;
+      if(room <= 0){ v.state='blocked'; continue; } // wait: destination full (§6.6)
+      const amt = Math.min(TRANSFER_RATE, v.cargoAmount, room);
+      target.stock += amt;
+      v.cargoAmount -= amt;
+      if(target.consumer){
+        const income = Math.round(amt * RESOURCE.baseValue * target.priceMultiplier);
+        credit(income, `delivery to ${BUILDING_DEFS.town.label} #${target.id}`);
+      }
+      if(v.cargoAmount<=0){ advanceOrder(v); v.state='idle'; }
+      continue;
+    }
+  }
+}
+
+function tickUpkeep(){
+  for(const v of world.entities.values()){
+    if(v.kind!=='vehicle') continue;
+    if(v.orders.length===0) continue; // parked/unassigned trucks don't burn cash
+    world.treasury -= VEHICLE_DEFS.truck.runningCostPerTick;
+  }
+}
+
+function simTick(){
+  tickProduction();
+  tickVehicles();
+  tickUpkeep();
+  world.tick++;
+}
+
+// ---------------------------------------------------------------------
+// FIXED-TIMESTEP LOOP  (§8 — decoupled from render framerate)
+// ---------------------------------------------------------------------
+let acc = 0, lastT = performance.now();
+function frame(now){
+  const dt = now - lastT; lastT = now;
+  acc += dt;
+  while(acc >= TICK_MS){ simTick(); acc -= TICK_MS; }
+  render();
+  requestAnimationFrame(frame);
+}
+
+// ---------------------------------------------------------------------
+// RENDERING
+// ---------------------------------------------------------------------
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+function render(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  // grid lines
+  ctx.strokeStyle = getCss('--grid-line');
+  ctx.lineWidth = 1;
+  for(let x=0;x<=GRID_W;x++){ ctx.beginPath(); ctx.moveTo(x*CELL+.5,0); ctx.lineTo(x*CELL+.5,GRID_H*CELL); ctx.stroke(); }
+  for(let y=0;y<=GRID_H;y++){ ctx.beginPath(); ctx.moveTo(0,y*CELL+.5); ctx.lineTo(GRID_W*CELL,y*CELL+.5); ctx.stroke(); }
+
+  // roads
+  for(const [k,cell] of world.grid){
+    if(!cell.road) continue;
+    const [x,y] = k.split(',').map(Number);
+    ctx.fillStyle = getCss('--road');
+    ctx.fillRect(x*CELL+4,y*CELL+4,CELL-8,CELL-8);
+  }
+
+  // buildings
+  for(const e of world.entities.values()){
+    if(e.kind!=='building') continue;
+    const def = BUILDING_DEFS[e.type];
+    ctx.fillStyle = def.color;
+    const halted = e.producer && (e.stock+1 > e.storageCap);
+    ctx.fillRect(e.x*CELL+2,e.y*CELL+2,CELL-4,CELL-4);
+    if(halted){ ctx.strokeStyle = getCss('--danger'); ctx.lineWidth=2; ctx.strokeRect(e.x*CELL+3,e.y*CELL+3,CELL-6,CELL-6); }
+    if(e===selected){ ctx.strokeStyle = getCss('--amber'); ctx.lineWidth=2; ctx.strokeRect(e.x*CELL+1,e.y*CELL+1,CELL-2,CELL-2); }
+    // fill bar
+    const pct = e.stock / e.storageCap;
+    ctx.fillStyle = 'rgba(0,0,0,.5)';
+    ctx.fillRect(e.x*CELL+4, e.y*CELL+CELL-9, CELL-8, 4);
+    ctx.fillStyle = getCss('--teal');
+    ctx.fillRect(e.x*CELL+4, e.y*CELL+CELL-9, (CELL-8)*pct, 4);
+  }
+
+  // vehicles
+  for(const v of world.entities.values()){
+    if(v.kind!=='vehicle') continue;
+    ctx.fillStyle = v.state==='blocked' ? getCss('--danger') : getCss('--amber');
+    const cx = v.x*CELL+CELL/2, cy = v.y*CELL+CELL/2;
+    ctx.beginPath(); ctx.arc(cx,cy,8,0,Math.PI*2); ctx.fill();
+    if(v===selected){ ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(cx,cy,11,0,Math.PI*2); ctx.stroke(); }
+  }
+
+  // hover ghost for build tools
+  if(hoverCell && (currentTool==='road' || currentTool==='mine' || currentTool==='town' || currentTool==='truck')){
+    ctx.strokeStyle = getCss('--teal');
+    ctx.lineWidth = 2;
+    ctx.strokeRect(hoverCell.x*CELL+1, hoverCell.y*CELL+1, CELL-2, CELL-2);
+  }
+
+  // HUD
+  const treasuryEl = document.getElementById('treasury');
+  treasuryEl.textContent = '$' + world.treasury;
+  treasuryEl.classList.toggle('negative', world.treasury < 0);
+  document.getElementById('tickInfo').textContent = 'tick ' + world.tick;
+}
+function getCss(varName){ return getComputedStyle(document.documentElement).getPropertyValue(varName).trim(); }
+
+// ---------------------------------------------------------------------
+// UI WIRING (tools, selection, order editor)
+// ---------------------------------------------------------------------
+let currentTool = 'select';
+let selected = null;       // selected building or vehicle
+let pickingStopFor = null; // vehicle awaiting a click on a building to add a stop
+let hoverCell = null;
+
+document.querySelectorAll('.tool-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.tool-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    currentTool = btn.dataset.tool;
+    document.getElementById('hint').textContent = toolHint(currentTool);
+  });
+});
+function toolHint(t){
+  return {
+    select:'Click a building or truck to inspect it.',
+    road:'Click or drag to build road ($10/tile).',
+    mine:'Click a cell next to a road to build a Mine.',
+    town:'Click a cell next to a road to build a Town.',
+    demolish:'Click a road tile or building to remove it.',
+    truck:'Click a road tile to buy a truck ($200) there.',
+  }[t] || '';
+}
+
+function currentTier(){ return document.getElementById('tierSelect').value; }
+
+function cellFromEvent(evt){
+  const rect = canvas.getBoundingClientRect();
+  const x = Math.floor((evt.clientX-rect.left)/CELL);
+  const y = Math.floor((evt.clientY-rect.top)/CELL);
+  if(!inBounds(x,y)) return null;
+  return {x,y};
+}
+
+let dragging = false;
+canvas.addEventListener('mousedown', evt=>{
+  const cell = cellFromEvent(evt); if(!cell) return;
+  dragging = true;
+  handleClick(cell);
+});
+canvas.addEventListener('mousemove', evt=>{
+  hoverCell = cellFromEvent(evt);
+  if(dragging && currentTool==='road' && hoverCell){ cmdBuildRoad(hoverCell.x, hoverCell.y); }
+});
+window.addEventListener('mouseup', ()=>{ dragging=false; });
+
+function buildingAt(x,y){
+  const cell = getCell(x,y);
+  return cell.buildingId ? world.entities.get(cell.buildingId) : null;
+}
+function vehicleAt(x,y){
+  for(const v of world.entities.values()) if(v.kind==='vehicle' && v.x===x && v.y===y) return v;
+  return null;
+}
+
+function handleClick(cell){
+  const {x,y} = cell;
+
+  // Order-editor "pick a stop" mode takes priority over the active tool.
+  if(pickingStopFor){
+    const b = buildingAt(x,y);
+    if(b){
+      const action = b.type==='mine' ? 'load_full' : 'unload_all';
+      const orders = pickingStopFor.orders.slice();
+      orders.push({nodeId:b.id, action});
+      cmdSetOrders(pickingStopFor, orders);
+      renderOrderEditor(pickingStopFor);
+    }
+    return;
+  }
+
+  if(currentTool==='select'){
+    const v = vehicleAt(x,y);
+    const b = buildingAt(x,y);
+    selected = v || b || null;
+    renderSelection();
+    return;
+  }
+  if(currentTool==='road'){ cmdBuildRoad(x,y); return; }
+  if(currentTool==='mine'){ cmdBuildBuilding('mine', x, y, currentTier()); return; }
+  if(currentTool==='town'){ cmdBuildBuilding('town', x, y, currentTier()); return; }
+  if(currentTool==='demolish'){ cmdDemolish(x,y); return; }
+  if(currentTool==='truck'){ cmdPurchaseVehicle(x,y); return; }
+}
+
+function renderSelection(){
+  const panel = document.getElementById('selectionInfo');
+  if(!selected){ panel.innerHTML = 'Nothing selected. Click a building or a truck.'; return; }
+
+  if(selected.kind==='building'){
+    const def = BUILDING_DEFS[selected.type];
+    panel.innerHTML = `
+      <div><b>${def.label} #${selected.id}</b></div>
+      <div>Stock: ${selected.stock} / ${selected.storageCap} Ore</div>
+      <div class="fill-bar"><div style="width:${(selected.stock/selected.storageCap*100).toFixed(0)}%"></div></div>
+      ${selected.producer ? `<div>${selected.stock+1>selected.storageCap ? '<span style="color:var(--danger)">Halted — storage full</span>' : 'Producing…'}</div>` : ''}
+      ${selected.consumer ? `<div>Pays $${RESOURCE.baseValue}/unit delivered</div>` : ''}
+    `;
+    return;
+  }
+
+  if(selected.kind==='vehicle'){
+    const def = VEHICLE_DEFS.truck;
+    let html = `
+      <div><b>${def.label} #${selected.id}</b></div>
+      <div>Cargo: ${selected.cargoAmount} / ${selected.capacity}</div>
+      <div>State: ${selected.state}${selected.state==='blocked' ? ' <span style="color:var(--danger)">(waiting)</span>' : ''}</div>
+      <div class="section-label">Orders</div>
+      <div id="ordersList"></div>
+      <button class="btn" id="addStopBtn">+ Add stop</button>
+      <button class="btn secondary" id="sellBtn">Sell ($${Math.round(def.purchaseCost*def.sellFraction)} refund)</button>
+    `;
+    panel.innerHTML = html;
+    document.getElementById('addStopBtn').addEventListener('click', ()=>{
+      pickingStopFor = selected;
+      document.getElementById('hint').textContent = 'Click a Mine or Town to add it as a stop.';
+    });
+    document.getElementById('sellBtn').addEventListener('click', ()=>{
+      cmdSellVehicle(selected);
+      selected = null;
+      renderSelection();
+    });
+    renderOrderEditor(selected);
+  }
+}
+
+function renderOrderEditor(vehicle){
+  const list = document.getElementById('ordersList');
+  if(!list) return;
+  list.innerHTML = '';
+  vehicle.orders.forEach((o, i)=>{
+    const b = world.entities.get(o.nodeId);
+    const row = document.createElement('div');
+    row.className = 'order-row';
+    row.innerHTML = `<span class="idx">${i+1}</span><span>${b ? BUILDING_DEFS[b.type].label+' #'+b.id : '(removed)'}</span><span class="act">${o.action}</span><span class="rm">✕</span>`;
+    row.querySelector('.rm').addEventListener('click', ()=>{
+      const orders = vehicle.orders.slice();
+      orders.splice(i,1);
+      cmdSetOrders(vehicle, orders);
+      renderOrderEditor(vehicle);
+    });
+    list.appendChild(row);
+  });
+}
+
+// keep the side panel numbers live even when nothing changed selection-wise
+setInterval(()=>{ if(selected) renderSelection(); }, 500);
+
+document.getElementById('mineCost').textContent = '$' + BUILDING_DEFS.mine.buildCost;
+document.getElementById('townCost').textContent = '$' + BUILDING_DEFS.town.buildCost;
+
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
