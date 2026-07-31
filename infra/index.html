@@ -114,6 +114,7 @@
     <button class="tool-btn" data-tool="road"><span class="tool-swatch" style="background:var(--road)"></span>Build Road<span class="cost">$10/tile</span></button>
     <button class="tool-btn" data-tool="mine"><span class="tool-swatch" style="background:#7a5230"></span>Build Mine<span class="cost" id="mineCost">$150</span></button>
     <button class="tool-btn" data-tool="town"><span class="tool-swatch" style="background:#3a6ea5"></span>Build Town<span class="cost" id="townCost">$100</span></button>
+    <button class="tool-btn" data-tool="station"><span class="tool-swatch" style="background:#c9a227"></span>Build Station<span class="cost" id="stationCost">$60</span></button>
     <button class="tool-btn" data-tool="demolish"><span class="tool-swatch" style="background:var(--danger)"></span>Demolish</button>
     <button class="tool-btn" data-tool="truck"><span class="tool-swatch" style="background:var(--amber)"></span>Buy Truck<span class="cost">$200</span></button>
 
@@ -126,9 +127,9 @@
 
     <div class="section-label">About</div>
     <div id="tierHint">
-      Roads auto-connect to adjacent road tiles. Mines and Towns must be placed
-      next to a road. Trucks only go where you send them — set their orders
-      in the panel on the right.
+      Trucks load and unload at Stations, never at a Mine or Town directly.
+      A Station must touch a Mine, Town, or another Station — chain Stations
+      together to reach a road from an industry that isn't right next to one.
     </div>
   </div>
 
@@ -174,10 +175,12 @@ const RECIPE_DURATION_TICKS = 4;   // mine produces 1 ore every N ticks
 const ROAD_COST_PER_TILE = 10;
 const TRANSFER_RATE = 4;           // units moved per tick during load/unload
 const TICK_MS = 300;               // fixed simulation timestep
+const CONSUMPTION_PER_CAPITA = 0.02; // ore drained per tick, per resident (§16-style: data-defined rate)
 
 const BUILDING_DEFS = {
-  mine: { buildCost: 150, tiers: { small:{cap:20, add:0}, large:{cap:50, add:100} }, color:'#7a5230', label:'Mine' },
-  town: { buildCost: 100, tiers: { small:{cap:20, add:0}, large:{cap:50, add:80}  }, color:'#3a6ea5', label:'Town' },
+  mine:    { buildCost: 150, tiers: { small:{cap:20, add:0}, large:{cap:50, add:100} }, color:'#7a5230', label:'Mine', footprint:{w:2,h:2} },
+  town:    { buildCost: 100, tiers: { small:{cap:20, add:0, population:50}, large:{cap:50, add:80, population:150} }, color:'#3a6ea5', label:'Town', footprint:{w:3,h:2} },
+  station: { buildCost: 60,  tiers: { small:{cap:0, add:0}, large:{cap:0, add:0} }, color:'#c9a227', label:'Station', footprint:{w:1,h:1} },
 };
 const VEHICLE_DEFS = {
   truck: { purchaseCost:200, runningCostPerTick:1, capacity:10, sellFraction:0.4, label:'Truck' },
@@ -237,9 +240,27 @@ function neighbors4(x,y){
 }
 function isRoad(x,y){ return getCell(x,y).road; }
 
-// Find a road-adjacent cell for a building (its "dock").
-function roadAccessCell(bx,by){
-  for(const [nx,ny] of neighbors4(bx,by)) if(isRoad(nx,ny)) return {x:nx,y:ny};
+// Every cell a building occupies, derived from its anchor (x,y) + footprint.
+function footprintCells(building){
+  const cells = [];
+  for(let dx=0; dx<building.footprint.w; dx++){
+    for(let dy=0; dy<building.footprint.h; dy++){
+      cells.push({x:building.x+dx, y:building.y+dy});
+    }
+  }
+  return cells;
+}
+
+// Find a road cell touching any side of the building's footprint (its "dock").
+// Works for any footprint size — a 3x2 Town is just as reachable as a 1x1.
+function buildingRoadAccessCell(building){
+  const own = new Set(footprintCells(building).map(c=>c.x+','+c.y));
+  for(const cell of footprintCells(building)){
+    for(const [nx,ny] of neighbors4(cell.x,cell.y)){
+      if(own.has(nx+','+ny)) continue; // don't count a neighbor that's part of the same building
+      if(isRoad(nx,ny)) return {x:nx,y:ny};
+    }
+  }
   return null;
 }
 
@@ -271,20 +292,55 @@ function findRoadPath(start, end){
   }
   return null;
 }
+// Vehicles always live on road cells (they dock next to a building rather
+// than entering its footprint), so a vehicle's own path is simply the road
+// route from where it stands to the target building's dock cell.
 
-// Full path for a vehicle: its current cell -> road dock -> ... -> target
-// building's road dock -> target building cell.
-function computeVehiclePath(vehicle, targetBuilding){
-  const fromDock = isRoad(vehicle.x, vehicle.y) ? {x:vehicle.x,y:vehicle.y} : roadAccessCell(vehicle.x, vehicle.y);
-  const toDock = roadAccessCell(targetBuilding.x, targetBuilding.y);
-  if(!fromDock || !toDock) return null;
-  const roadPath = findRoadPath(fromDock, toDock);
-  if(!roadPath) return null;
-  const full = [];
-  if(vehicle.x!==fromDock.x || vehicle.y!==fromDock.y) full.push({x:vehicle.x,y:vehicle.y});
-  full.push(...roadPath);
-  full.push({x:targetBuilding.x, y:targetBuilding.y});
-  return full;
+// A Station has no storage of its own. It's only a physical access point:
+// vehicles load/unload there, and the Station forwards that transfer to
+// whichever industry (Mine/Town) it's touching — directly, or through a
+// chain of other Stations that all touch each other. This walks that chain
+// and returns the first Mine/Town it finds, or null if the station isn't
+// connected to any industry right now.
+function findLinkedIndustry(station){
+  const visited = new Set([station.id]);
+  const queue = [station];
+  while(queue.length){
+    const s = queue.shift();
+    for(const cell of footprintCells(s)){
+      for(const [nx,ny] of neighbors4(cell.x,cell.y)){
+        const nCell = getCell(nx,ny);
+        if(!nCell.buildingId) continue;
+        const nb = world.entities.get(nCell.buildingId);
+        if(!nb || nb.id===s.id) continue;
+        if(nb.type==='station'){
+          if(!visited.has(nb.id)){ visited.add(nb.id); queue.push(nb); }
+        } else if(nb.producer || nb.consumer){
+          return nb;
+        }
+      }
+    }
+  }
+  return null;
+}
+
+// Does this footprint (for a building about to be placed) touch at least
+// one Mine, Town, or Station? Used to require Stations to actually connect
+// to something before they can be built (§6.6-style: don't let the player
+// build something structurally useless without at least a warning).
+function touchesIndustryOrStation(x, y, footprint){
+  const own = new Set();
+  for(let dx=0; dx<footprint.w; dx++) for(let dy=0; dy<footprint.h; dy++) own.add((x+dx)+','+(y+dy));
+  for(let dx=0; dx<footprint.w; dx++){
+    for(let dy=0; dy<footprint.h; dy++){
+      for(const [nx,ny] of neighbors4(x+dx, y+dy)){
+        if(own.has(nx+','+ny)) continue;
+        const nb = getCell(nx,ny).buildingId ? world.entities.get(getCell(nx,ny).buildingId) : null;
+        if(nb && (nb.type==='mine' || nb.type==='town' || nb.type==='station')) return true;
+      }
+    }
+  }
+  return false;
 }
 
 // ---------------------------------------------------------------------
@@ -293,17 +349,21 @@ function computeVehiclePath(vehicle, targetBuilding){
 function createBuilding(type, x, y, tier){
   const def = BUILDING_DEFS[type];
   const id = world.nextId++;
+  const population = type==='town' ? def.tiers[tier].population : 0;
   const entity = {
     id, kind:'building', type, x, y,
+    footprint: { w:def.footprint.w, h:def.footprint.h }, // cells occupied, anchored at (x,y)
     storageCap: def.tiers[tier].cap,
     stock: 0,               // single-resource Phase 1: always 'ore'
     ticksRemaining: type==='mine' ? RECIPE_DURATION_TICKS : null,
     producer: type==='mine',
     consumer: type==='town',
     priceMultiplier: 1.0,
+    population,
+    consumptionPerTick: population * CONSUMPTION_PER_CAPITA,
   };
   world.entities.set(id, entity);
-  getCell(x,y).buildingId = id;
+  for(const cell of footprintCells(entity)) getCell(cell.x, cell.y).buildingId = id;
   return entity;
 }
 function createVehicle(x,y){
@@ -333,11 +393,24 @@ function cmdBuildRoad(x,y){
   cell.road = true;
 }
 function cmdBuildBuilding(type, x, y, tier){
-  const cell = getCell(x,y);
-  if(cell.road || cell.buildingId){ logEvent('Cell occupied.', 'warn'); return; }
-  const hasRoadNeighbor = neighbors4(x,y).some(([nx,ny])=>isRoad(nx,ny));
-  if(!hasRoadNeighbor){ logEvent(`${BUILDING_DEFS[type].label} must be built next to a road.`, 'warn'); return; }
   const def = BUILDING_DEFS[type];
+  const {w,h} = def.footprint;
+  for(let dx=0; dx<w; dx++){
+    for(let dy=0; dy<h; dy++){
+      const cx = x+dx, cy = y+dy;
+      if(!inBounds(cx,cy)){ logEvent(`${def.label} footprint (${w}x${h}) doesn't fit on the grid there.`, 'warn'); return; }
+      const cell = getCell(cx,cy);
+      if(cell.road || cell.buildingId){ logEvent(`${def.label} footprint overlaps something at (${cx},${cy}).`, 'warn'); return; }
+    }
+  }
+  if(type==='station'){
+    // Stations don't touch roads directly here — they touch an industry, or
+    // another station, forming the access chain vehicles actually use.
+    if(!touchesIndustryOrStation(x, y, {w,h})){
+      logEvent('A Station must touch a Mine, Town, or another Station.', 'warn');
+      return;
+    }
+  }
   const cost = def.buildCost + def.tiers[tier].add;
   if(!canAfford(cost)){ logEvent('Insufficient funds for construction.', 'warn'); return; }
   charge(cost, `${def.label} (${tier})`);
@@ -346,8 +419,9 @@ function cmdBuildBuilding(type, x, y, tier){
 function cmdDemolish(x,y){
   const cell = getCell(x,y);
   if(cell.buildingId){
+    const building = world.entities.get(cell.buildingId);
+    if(building){ for(const c of footprintCells(building)) getCell(c.x,c.y).buildingId = null; }
     world.entities.delete(cell.buildingId);
-    cell.buildingId = null;
   } else if(cell.road){
     cell.road = false;
   }
@@ -387,8 +461,20 @@ function tickProduction(){
   }
 }
 
+function tickConsumption(){
+  // Towns eat into their own stock every tick, independent of deliveries —
+  // a town with no incoming trucks will run its storage down to zero even
+  // though nothing is being loaded/unloaded there.
+  for(const e of world.entities.values()){
+    if(e.kind!=='building' || !e.consumer) continue;
+    e.stock = Math.max(0, e.stock - e.consumptionPerTick);
+  }
+}
+
 function startMovingTo(vehicle, building){
-  const path = computeVehiclePath(vehicle, building);
+  const dock = buildingRoadAccessCell(building);
+  if(!dock){ vehicle.state='blocked'; return false; } // no road touches this building right now
+  const path = findRoadPath({x:vehicle.x, y:vehicle.y}, dock);
   if(!path){ vehicle.state='blocked'; return false; }
   vehicle.path = path;
   vehicle.pathIndex = 0;
@@ -417,7 +503,9 @@ function tickVehicles(){
     if(v.state==='idle' || v.state==='blocked'){
       // (Re)try to reach, or act on, the current order's target. 'blocked'
       // retries every tick until the resource/space it's waiting on frees up.
-      if(v.x===target.x && v.y===target.y){
+      const dock = buildingRoadAccessCell(target);
+      if(!dock){ v.state='blocked'; continue; } // building has no road access right now
+      if(v.x===dock.x && v.y===dock.y){
         v.state = order.action==='load_full' ? 'loading' : 'unloading';
       } else {
         startMovingTo(v, target); // -> 'moving', or 'blocked' if unreachable
@@ -440,27 +528,32 @@ function tickVehicles(){
     }
 
     if(v.state==='loading'){
-      // Mine -> truck (§6.6 LoadUnloadSystem)
-      if(target.stock <= 0){ v.state='blocked'; continue; } // wait: source empty
+      // Vehicle is docked at a Station; the Station forwards to whichever
+      // industry it (or its chain of touching Stations) connects to (§ Stations).
+      const industry = findLinkedIndustry(target);
+      if(!industry){ v.state='blocked'; continue; } // wait: station not connected to anything
+      if(industry.stock <= 0){ v.state='blocked'; continue; } // wait: source empty
       const room = v.capacity - v.cargoAmount;
       if(room <= 0){ advanceOrder(v); v.state='idle'; continue; } // full, move on
-      const amt = Math.min(TRANSFER_RATE, target.stock, room);
-      target.stock -= amt;
+      const amt = Math.min(TRANSFER_RATE, industry.stock, room);
+      industry.stock -= amt;
       v.cargoAmount += amt;
       if(v.cargoAmount >= v.capacity){ advanceOrder(v); v.state='idle'; }
       continue;
     }
 
     if(v.state==='unloading'){
+      const industry = findLinkedIndustry(target);
+      if(!industry){ v.state='blocked'; continue; } // wait: station not connected to anything
       if(v.cargoAmount<=0){ advanceOrder(v); v.state='idle'; continue; }
-      const room = target.storageCap - target.stock;
+      const room = industry.storageCap - industry.stock;
       if(room <= 0){ v.state='blocked'; continue; } // wait: destination full (§6.6)
       const amt = Math.min(TRANSFER_RATE, v.cargoAmount, room);
-      target.stock += amt;
+      industry.stock += amt;
       v.cargoAmount -= amt;
-      if(target.consumer){
-        const income = Math.round(amt * RESOURCE.baseValue * target.priceMultiplier);
-        credit(income, `delivery to ${BUILDING_DEFS.town.label} #${target.id}`);
+      if(industry.consumer){
+        const income = Math.round(amt * RESOURCE.baseValue * industry.priceMultiplier);
+        credit(income, `delivery to ${BUILDING_DEFS.town.label} #${industry.id}`);
       }
       if(v.cargoAmount<=0){ advanceOrder(v); v.state='idle'; }
       continue;
@@ -479,6 +572,7 @@ function tickUpkeep(){
 function simTick(){
   tickProduction();
   tickVehicles();
+  tickConsumption();
   tickUpkeep();
   world.tick++;
 }
@@ -521,17 +615,29 @@ function render(){
   for(const e of world.entities.values()){
     if(e.kind!=='building') continue;
     const def = BUILDING_DEFS[e.type];
+    const px = e.x*CELL, py = e.y*CELL;
+    const pw = e.footprint.w*CELL, ph = e.footprint.h*CELL;
     ctx.fillStyle = def.color;
     const halted = e.producer && (e.stock+1 > e.storageCap);
-    ctx.fillRect(e.x*CELL+2,e.y*CELL+2,CELL-4,CELL-4);
-    if(halted){ ctx.strokeStyle = getCss('--danger'); ctx.lineWidth=2; ctx.strokeRect(e.x*CELL+3,e.y*CELL+3,CELL-6,CELL-6); }
-    if(e===selected){ ctx.strokeStyle = getCss('--amber'); ctx.lineWidth=2; ctx.strokeRect(e.x*CELL+1,e.y*CELL+1,CELL-2,CELL-2); }
-    // fill bar
-    const pct = e.stock / e.storageCap;
-    ctx.fillStyle = 'rgba(0,0,0,.5)';
-    ctx.fillRect(e.x*CELL+4, e.y*CELL+CELL-9, CELL-8, 4);
-    ctx.fillStyle = getCss('--teal');
-    ctx.fillRect(e.x*CELL+4, e.y*CELL+CELL-9, (CELL-8)*pct, 4);
+    ctx.fillRect(px+2, py+2, pw-4, ph-4);
+    if(halted){ ctx.strokeStyle = getCss('--danger'); ctx.lineWidth=2; ctx.strokeRect(px+3, py+3, pw-6, ph-6); }
+    if(e===selected){ ctx.strokeStyle = getCss('--amber'); ctx.lineWidth=2; ctx.strokeRect(px+1, py+1, pw-2, ph-2); }
+    ctx.fillStyle = '#fff';
+    ctx.font = '10px monospace';
+    ctx.fillText(`${def.label} #${e.id}`, px+5, py+13);
+    // fill bar spans the building's full footprint width (Stations have no
+    // storage of their own — show a linked/unlinked indicator dot instead)
+    if(e.type==='station'){
+      const linked = !!findLinkedIndustry(e);
+      ctx.fillStyle = linked ? getCss('--teal') : getCss('--danger');
+      ctx.beginPath(); ctx.arc(px+pw-8, py+ph-8, 4, 0, Math.PI*2); ctx.fill();
+    } else {
+      const pct = e.stock / e.storageCap;
+      ctx.fillStyle = 'rgba(0,0,0,.5)';
+      ctx.fillRect(px+4, py+ph-9, pw-8, 4);
+      ctx.fillStyle = getCss('--teal');
+      ctx.fillRect(px+4, py+ph-9, (pw-8)*pct, 4);
+    }
   }
 
   // vehicles
@@ -543,11 +649,16 @@ function render(){
     if(v===selected){ ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(cx,cy,11,0,Math.PI*2); ctx.stroke(); }
   }
 
-  // hover ghost for build tools
-  if(hoverCell && (currentTool==='road' || currentTool==='mine' || currentTool==='town' || currentTool==='truck')){
+  // hover ghost for build tools — sized to the building's footprint where relevant
+  if(hoverCell){
     ctx.strokeStyle = getCss('--teal');
     ctx.lineWidth = 2;
-    ctx.strokeRect(hoverCell.x*CELL+1, hoverCell.y*CELL+1, CELL-2, CELL-2);
+    if(currentTool==='mine' || currentTool==='town' || currentTool==='station'){
+      const fp = BUILDING_DEFS[currentTool].footprint;
+      ctx.strokeRect(hoverCell.x*CELL+1, hoverCell.y*CELL+1, fp.w*CELL-2, fp.h*CELL-2);
+    } else if(currentTool==='road' || currentTool==='truck'){
+      ctx.strokeRect(hoverCell.x*CELL+1, hoverCell.y*CELL+1, CELL-2, CELL-2);
+    }
   }
 
   // HUD
@@ -578,8 +689,9 @@ function toolHint(t){
   return {
     select:'Click a building or truck to inspect it.',
     road:'Click or drag to build road ($10/tile).',
-    mine:'Click a cell next to a road to build a Mine.',
-    town:'Click a cell next to a road to build a Town.',
+    mine:`Click the top-left cell for a Mine (${BUILDING_DEFS.mine.footprint.w}x${BUILDING_DEFS.mine.footprint.h}). It doesn't need to touch a road itself — build a Station touching it for trucks to use.`,
+    town:`Click the top-left cell for a Town (${BUILDING_DEFS.town.footprint.w}x${BUILDING_DEFS.town.footprint.h}). It doesn't need to touch a road itself — build a Station touching it for trucks to use.`,
+    station:`Click a cell touching a Mine, Town, or another Station (${BUILDING_DEFS.station.footprint.w}x${BUILDING_DEFS.station.footprint.h}). Trucks load/unload at Stations, not at the industry itself.`,
     demolish:'Click a road tile or building to remove it.',
     truck:'Click a road tile to buy a truck ($200) there.',
   }[t] || '';
@@ -622,13 +734,22 @@ function handleClick(cell){
   // Order-editor "pick a stop" mode takes priority over the active tool.
   if(pickingStopFor){
     const b = buildingAt(x,y);
-    if(b){
-      const action = b.type==='mine' ? 'load_full' : 'unload_all';
-      const orders = pickingStopFor.orders.slice();
-      orders.push({nodeId:b.id, action});
-      cmdSetOrders(pickingStopFor, orders);
-      renderOrderEditor(pickingStopFor);
+    if(b && b.type!=='station'){
+      logEvent('Trucks load/unload at Stations, not at the industry itself.', 'warn');
+    } else if(b && b.type==='station'){
+      const industry = findLinkedIndustry(b);
+      if(!industry){
+        logEvent(`Station #${b.id} isn't connected to any industry yet.`, 'warn');
+      } else {
+        const action = industry.producer ? 'load_full' : 'unload_all';
+        const orders = pickingStopFor.orders.slice();
+        orders.push({nodeId:b.id, action});
+        cmdSetOrders(pickingStopFor, orders);
+        renderOrderEditor(pickingStopFor);
+      }
     }
+    pickingStopFor = null;
+    document.getElementById('hint').textContent = toolHint(currentTool);
     return;
   }
 
@@ -642,6 +763,7 @@ function handleClick(cell){
   if(currentTool==='road'){ cmdBuildRoad(x,y); return; }
   if(currentTool==='mine'){ cmdBuildBuilding('mine', x, y, currentTier()); return; }
   if(currentTool==='town'){ cmdBuildBuilding('town', x, y, currentTier()); return; }
+  if(currentTool==='station'){ cmdBuildBuilding('station', x, y, 'small'); return; }
   if(currentTool==='demolish'){ cmdDemolish(x,y); return; }
   if(currentTool==='truck'){ cmdPurchaseVehicle(x,y); return; }
 }
@@ -650,14 +772,31 @@ function renderSelection(){
   const panel = document.getElementById('selectionInfo');
   if(!selected){ panel.innerHTML = 'Nothing selected. Click a building or a truck.'; return; }
 
+  if(selected.kind==='building' && selected.type==='station'){
+    const industry = findLinkedIndustry(selected);
+    panel.innerHTML = `
+      <div><b>${BUILDING_DEFS.station.label} #${selected.id}</b></div>
+      <div>${industry
+        ? `Linked to: ${BUILDING_DEFS[industry.type].label} #${industry.id}`
+        : '<span style="color:var(--danger)">Not connected to any industry</span>'}</div>
+    `;
+    return;
+  }
+
   if(selected.kind==='building'){
     const def = BUILDING_DEFS[selected.type];
     panel.innerHTML = `
       <div><b>${def.label} #${selected.id}</b></div>
-      <div>Stock: ${selected.stock} / ${selected.storageCap} Ore</div>
+      <div>Stock: ${selected.stock.toFixed(1)} / ${selected.storageCap} Ore</div>
       <div class="fill-bar"><div style="width:${(selected.stock/selected.storageCap*100).toFixed(0)}%"></div></div>
       ${selected.producer ? `<div>${selected.stock+1>selected.storageCap ? '<span style="color:var(--danger)">Halted — storage full</span>' : 'Producing…'}</div>` : ''}
-      ${selected.consumer ? `<div>Pays $${RESOURCE.baseValue}/unit delivered</div>` : ''}
+      ${selected.consumer ? `
+        <div>Population: ${selected.population}</div>
+        <div>Consuming: ${selected.consumptionPerTick.toFixed(2)}/tick</div>
+        ${selected.stock<=0 ? '<div style="color:var(--danger)">Out of stock — nothing to consume</div>' : ''}
+        <div>Pays $${RESOURCE.baseValue}/unit delivered</div>
+      ` : ''}
+      <div style="margin-top:6px;color:var(--text-dim);font-size:11px;">Trucks can't load/unload here directly — build a Station touching this building.</div>
     `;
     return;
   }
@@ -666,7 +805,7 @@ function renderSelection(){
     const def = VEHICLE_DEFS.truck;
     let html = `
       <div><b>${def.label} #${selected.id}</b></div>
-      <div>Cargo: ${selected.cargoAmount} / ${selected.capacity}</div>
+      <div>Cargo: ${selected.cargoAmount.toFixed(1)} / ${selected.capacity}</div>
       <div>State: ${selected.state}${selected.state==='blocked' ? ' <span style="color:var(--danger)">(waiting)</span>' : ''}</div>
       <div class="section-label">Orders</div>
       <div id="ordersList"></div>
@@ -676,7 +815,7 @@ function renderSelection(){
     panel.innerHTML = html;
     document.getElementById('addStopBtn').addEventListener('click', ()=>{
       pickingStopFor = selected;
-      document.getElementById('hint').textContent = 'Click a Mine or Town to add it as a stop.';
+      document.getElementById('hint').textContent = 'Click a Station to add it as a stop.';
     });
     document.getElementById('sellBtn').addEventListener('click', ()=>{
       cmdSellVehicle(selected);
@@ -711,6 +850,7 @@ setInterval(()=>{ if(selected) renderSelection(); }, 500);
 
 document.getElementById('mineCost').textContent = '$' + BUILDING_DEFS.mine.buildCost;
 document.getElementById('townCost').textContent = '$' + BUILDING_DEFS.town.buildCost;
+document.getElementById('stationCost').textContent = '$' + BUILDING_DEFS.station.buildCost;
 
 requestAnimationFrame(frame);
 </script>
